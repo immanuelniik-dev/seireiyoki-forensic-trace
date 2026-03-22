@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Search, ShieldCheck, MapPin, Box, Activity, Fingerprint, Globe } from "lucide-react";
+import Link from "next/link";
 
 // Initialize Supabase
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -85,9 +86,10 @@ export default function ForensicDashboard() {
       ) : (
         <div className="grid grid-cols-1 gap-6">
           {filteredBatches.map((batch) => (
-            <div
+            <Link
+              href={`/batch/${batch.batch_number}`}
               key={batch.id}
-              className="bg-[#0c0c0c] border border-gray-800/80 rounded-xl p-6 hover:border-cyan-800/60 transition-all duration-300 relative overflow-hidden group"
+              className="block bg-[#0c0c0c] border border-gray-800/80 rounded-xl p-6 hover:border-cyan-800/60 transition-all duration-300 relative overflow-hidden group cursor-pointer"
             >
               {/* Neon accent glow line on hover */}
               <div className="absolute top-0 left-0 w-1 h-full bg-cyan-600 shadow-[0_0_20px_rgba(6,182,212,1)] opacity-70 group-hover:opacity-100 transition-opacity"></div>
@@ -160,7 +162,7 @@ export default function ForensicDashboard() {
                 </div>
 
               </div>
-            </div>
+            </Link>
           ))}
           
           {filteredBatches.length === 0 && (
