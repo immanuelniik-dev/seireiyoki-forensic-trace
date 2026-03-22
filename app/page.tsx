@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Search, ShieldCheck, MapPin, Box, Activity } from "lucide-react";
+import { Search, ShieldCheck, MapPin, Box, Activity, Fingerprint, Globe } from "lucide-react";
 
 // Initialize Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function ForensicDashboard() {
@@ -19,14 +19,19 @@ export default function ForensicDashboard() {
   }, []);
 
   async function fetchBatches() {
-    const { data, error } = await supabase
-      .from("batches")
-      .select("*")
-      .order("last_updated", { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from("batches")
+        .select("*")
+        .order("last_updated", { ascending: false });
 
-    if (error) console.error("Error fetching data:", error);
-    else setBatches(data || []);
-    setLoading(false);
+      if (error) throw error;
+      setBatches(data || []);
+    } catch (error) {
+      console.error("Forensic Audit Error:", error);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const filteredBatches = batches.filter((batch) =>
@@ -34,101 +39,124 @@ export default function ForensicDashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-gray-300 font-mono selection:bg-cyan-900 selection:text-cyan-100 p-6 md:p-12">
-      {/* Header */}
-      <header className="mb-12 border-b border-cyan-900/50 pb-6 flex items-center justify-between">
+    <div className="min-h-screen bg-[#050505] text-gray-300 font-mono selection:bg-cyan-900 selection:text-cyan-100 p-6 md:p-12">
+      
+      {/* Top Navigation / Header */}
+      <header className="mb-12 border-b border-cyan-900/40 pb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-            <ShieldCheck className="text-cyan-400 w-8 h-8" />
-            YOKI TECHNOLOGY <span className="text-cyan-400 font-light">LTD</span>
+          <h1 className="text-3xl font-bold text-white tracking-tighter flex items-center gap-3">
+            <Fingerprint className="text-cyan-500 w-8 h-8 drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
+            YOKI TECHNOLOGY <span className="text-cyan-500 font-light">LTD</span>
           </h1>
-          <p className="text-sm text-gray-500 mt-1 uppercase tracking-widest">
-            Digital Forensic Supply Chain Audit
+          <p className="text-xs text-cyan-700 mt-2 uppercase tracking-[0.3em] font-semibold">
+            Digital Forensic Audit Protocol
           </p>
         </div>
-        <div className="hidden md:flex items-center gap-2 text-xs bg-cyan-950/30 text-cyan-400 px-3 py-1.5 rounded border border-cyan-900/50">
+        
+        <div className="flex items-center gap-3 text-xs bg-[#0a0f14] text-cyan-400 px-4 py-2 rounded-md border border-cyan-900/50 shadow-[0_0_15px_rgba(6,182,212,0.1)]">
           <Activity className="w-4 h-4 animate-pulse" />
-          SYSTEM ACTIVE
+          <span>SECURE NETWORK ENCRYPTED</span>
         </div>
       </header>
 
-      {/* Search Bar */}
-      <div className="relative max-w-2xl mb-12">
+      {/* Action Bar: Search */}
+      <div className="relative max-w-3xl mb-12 group">
         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-          <Search className="h-5 w-5 text-cyan-500" />
+          <Search className="h-5 w-5 text-cyan-600 group-focus-within:text-cyan-400 transition-colors" />
         </div>
         <input
           type="text"
-          className="block w-full bg-[#111] border border-gray-800 rounded-lg py-4 pl-12 pr-4 text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 transition-all"
-          placeholder="Enter Batch ID to Verify Integrity..."
+          className="block w-full bg-[#0a0a0a] border border-gray-800 rounded-lg py-5 pl-12 pr-4 text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] uppercase tracking-wider text-sm"
+          placeholder="ENTER BATCH ID TO VERIFY INTEGRITY..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
+        <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+           <span className="text-[10px] text-gray-600 tracking-widest border border-gray-700 px-2 py-1 rounded">CTRL+K</span>
+        </div>
       </div>
 
-      {/* Data Grid */}
+      {/* Main Data Grid */}
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-cyan-500">
-          <Activity className="w-8 h-8 animate-spin" />
+        <div className="flex flex-col items-center justify-center py-32 space-y-4">
+          <Activity className="w-10 h-10 text-cyan-500 animate-spin" />
+          <p className="text-cyan-700 text-xs uppercase tracking-widest animate-pulse">Syncing with Ledger...</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6">
           {filteredBatches.map((batch) => (
             <div
               key={batch.id}
-              className="bg-[#111] border border-gray-800 rounded-xl p-6 hover:border-cyan-800/50 transition-colors relative overflow-hidden"
+              className="bg-[#0c0c0c] border border-gray-800/80 rounded-xl p-6 hover:border-cyan-800/60 transition-all duration-300 relative overflow-hidden group"
             >
-              {/* Neon accent line */}
-              <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.6)]"></div>
+              {/* Neon accent glow line on hover */}
+              <div className="absolute top-0 left-0 w-1 h-full bg-cyan-600 shadow-[0_0_20px_rgba(6,182,212,1)] opacity-70 group-hover:opacity-100 transition-opacity"></div>
               
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 ml-4">
+              <div className="flex flex-col md:flex-row justify-between gap-8 ml-4">
                 
-                {/* Product Info */}
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-xs font-bold bg-gray-800 text-gray-300 px-2 py-1 rounded tracking-widest">
-                      ID: {batch.batch_number}
+                {/* Section 1: Identity & Badge */}
+                <div className="md:w-1/3 flex flex-col justify-center">
+                  <div className="flex items-center gap-4 mb-3">
+                    <span className="text-sm font-bold bg-black text-gray-300 px-3 py-1.5 rounded-md border border-gray-800 tracking-widest">
+                      {batch.batch_number}
                     </span>
-                    <span className="flex items-center gap-1 text-xs text-cyan-400 font-semibold uppercase tracking-wider bg-cyan-950/30 px-2 py-1 rounded border border-cyan-900/30">
-                      <ShieldCheck className="w-3 h-3" />
+                    {/* Glowing Verification Badge */}
+                    <span className="flex items-center gap-1.5 text-xs text-cyan-300 font-bold uppercase tracking-wider bg-cyan-950/40 px-3 py-1.5 rounded-md border border-cyan-500/50 shadow-[0_0_12px_rgba(6,182,212,0.4)]">
+                      <ShieldCheck className="w-3.5 h-3.5" />
                       Verified
                     </span>
                   </div>
-                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    <Box className="w-5 h-5 text-gray-500" />
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2 mt-2">
+                    <Box className="w-5 h-5 text-cyan-700" />
                     {batch.product_name}
                   </h2>
                 </div>
 
-                {/* Logistics Info */}
-                <div className="flex flex-col gap-2 md:w-1/3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500">Origin:</span>
-                    <span className="text-gray-200">{batch.origin}</span>
+                {/* Section 2: Logistics Route */}
+                <div className="md:w-1/3 flex flex-col justify-center gap-3 border-l-2 border-gray-900 pl-6">
+                  <div className="flex items-start gap-3">
+                    <Globe className="w-4 h-4 text-gray-500 mt-0.5" />
+                    <div>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-widest">Origin Point</p>
+                      <p className="text-sm text-gray-300 font-semibold">{batch.origin}</p>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500">Status:</span>
-                    <span className="text-emerald-400 flex items-center gap-1">
-                      <MapPin className="w-3 h-3" />
-                      {batch.status}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500">Location:</span>
-                    <span className="text-white">{batch.current_location}</span>
+                  <div className="flex items-start gap-3">
+                    <MapPin className="w-4 h-4 text-cyan-600 mt-0.5" />
+                    <div>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-widest">Current Node</p>
+                      <p className="text-sm text-white font-semibold">{batch.current_location}</p>
+                    </div>
                   </div>
                 </div>
 
-                {/* Analytics */}
-                <div className="grid grid-cols-2 gap-4 md:border-l md:border-gray-800 md:pl-6 text-sm">
-                  <div className="bg-black/50 p-3 rounded border border-gray-900 text-center">
-                    <span className="block text-gray-500 text-xs uppercase mb-1">Protein</span>
-                    <span className="text-white font-bold">{batch.protein_percent}%</span>
-                  </div>
-                  <div className="bg-black/50 p-3 rounded border border-gray-900 text-center">
-                    <span className="block text-gray-500 text-xs uppercase mb-1">Moisture</span>
-                    <span className="text-white font-bold">{batch.moisture_percent}%</span>
-                  </div>
+                {/* Section 3: Status & Metrics */}
+                <div className="md:w-1/3 flex flex-col justify-center border-l-2 border-gray-900 pl-6">
+                   <div className="mb-4">
+                      <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">Transit Status</p>
+                      <p className="text-emerald-400 text-sm font-bold uppercase tracking-wide flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        {batch.status}
+                      </p>
+                   </div>
+                   
+                   {/* Optional: Add extra technical data here if your Supabase has protein/moisture columns */}
+                   {(batch.protein_percent || batch.moisture_percent) && (
+                     <div className="flex gap-4">
+                        {batch.protein_percent && (
+                          <div>
+                             <p className="text-[10px] text-gray-500 uppercase tracking-widest">Protein</p>
+                             <p className="text-cyan-400 font-bold">{batch.protein_percent}%</p>
+                          </div>
+                        )}
+                        {batch.moisture_percent && (
+                           <div>
+                             <p className="text-[10px] text-gray-500 uppercase tracking-widest">Moisture</p>
+                             <p className="text-cyan-400 font-bold">{batch.moisture_percent}%</p>
+                          </div>
+                        )}
+                     </div>
+                   )}
                 </div>
 
               </div>
@@ -136,8 +164,9 @@ export default function ForensicDashboard() {
           ))}
           
           {filteredBatches.length === 0 && (
-            <div className="text-center py-20 text-gray-600 border border-dashed border-gray-800 rounded-xl">
-              No batch records found matching your query.
+            <div className="text-center py-24 text-gray-600 border border-dashed border-gray-800 rounded-xl bg-[#080808]">
+              <Search className="w-8 h-8 mx-auto mb-3 text-gray-700" />
+              <p className="uppercase tracking-widest text-sm">NO RECORDS MATCH THE SEARCH CRITERIA</p>
             </div>
           )}
         </div>
