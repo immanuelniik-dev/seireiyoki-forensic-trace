@@ -47,10 +47,10 @@ export default function ForensicDashboard() {
         <div>
           <h1 className="text-3xl font-bold text-white tracking-tighter flex items-center gap-3">
             <Fingerprint className="text-cyan-500 w-8 h-8 drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
-            YOKI TECHNOLOGY <span className="text-cyan-500 font-light">LTD</span>
+            SEIREI YOKI TECHNOLOGY <span className="text-cyan-500 font-light">LTD</span>
           </h1>
           <p className="text-xs text-cyan-700 mt-2 uppercase tracking-[0.3em] font-semibold">
-            Digital Forensic Audit Protocol
+            Industrial Bran Quality & Integrity Ledger
           </p>
         </div>
         
@@ -68,7 +68,7 @@ export default function ForensicDashboard() {
         <input
           type="text"
           className="block w-full bg-[#0a0a0a] border border-gray-800 rounded-lg py-5 pl-12 pr-4 text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] uppercase tracking-wider text-sm"
-          placeholder="ENTER BATCH ID TO VERIFY INTEGRITY..."
+          placeholder="ENTER BRAN BATCH ID (e.g., BR-4002)..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />

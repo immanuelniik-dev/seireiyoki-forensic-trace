@@ -15,13 +15,13 @@ export default function AdminControlRoom() {
   
   // Form State
   const [formData, setFormData] = useState({
-    batch_number: "",
-    product_name: "",
-    origin: "",
-    current_location: "",
-    status: "Cleared Customs",
-    protein_percent: "",
-    moisture_percent: ""
+  batch_number: "",
+  product_name: "Premium Wheat Bran", // Default to Bran
+  origin: "", // e.g., HoneyWell Mills / Flour Mills of Nigeria
+  current_location: "Mill Gate",
+  status: "Quality Certified",
+  protein_percent: "14.5", // Standard Bran protein
+  moisture_percent: "12.5"  // Safe storage moisture
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -115,11 +115,12 @@ export default function AdminControlRoom() {
             <div>
               <label className="block text-[10px] text-gray-500 uppercase tracking-widest mb-2">Transit Status</label>
               <select name="status" value={formData.status} onChange={handleChange} className="w-full bg-[#050505] border border-gray-800 rounded py-3 px-4 text-white focus:outline-none focus:border-red-500 transition-colors appearance-none">
-                <option value="Cleared Customs">Cleared Customs</option>
-                <option value="In Transit to Mill">In Transit to Mill</option>
-                <option value="Arrived at Facility">Arrived at Facility</option>
-                <option value="Audit Flag - Quarantined">Audit Flag - Quarantined</option>
-              </select>
+                <option value="Quality Certified">Quality Certified (At Mill)</option>
+                <option value="In Transit - Sealed">In Transit - Sealed</option>
+               <option value="Delivered - Awaiting Audit">Delivered - Awaiting Audit</option>
+               <option value="Audit Verified">Audit Verified (At Farm)</option>
+               <option value="TAMPER ALERT">TAMPER ALERT - QUARANTINED</option>
+            </select>
             </div>
 
             {/* Nutritional Spec (Optional) */}
