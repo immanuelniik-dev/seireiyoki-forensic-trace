@@ -12,10 +12,20 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "SEIREIYOKI | Digital Forensic Audit",
   description: "Secure Last-Mile Supply Chain Traceability by SeireiYoki Technology Limited",
   themeColor: "#050505",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/icon.svg", // Explicitly point to the SVG
+    apple: "/icon.svg", // Use the same for Apple touch icons
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "SeireiYoki",
+  },
 };
 
 export default function RootLayout({

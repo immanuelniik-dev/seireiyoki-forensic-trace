@@ -1,0 +1,17 @@
+{
+  "name": "SeireiYoki Forensic",
+  "short_name": "SeireiYoki",
+  "description": "Industrial Bran Supply Chain Audit Terminal",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#050505",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
