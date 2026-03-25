@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-// FIXED: Added AlertTriangle to the imports
-import { ShieldAlert, Plus, Save, Server, Wheat, Droplets, Activity, CheckCircle, RefreshCcw, AlertTriangle } from "lucide-react";
+import { ShieldAlert, Save, Factory, Droplets, Activity, CheckCircle, RefreshCcw, AlertTriangle } from "lucide-react";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
@@ -15,12 +14,12 @@ export default function AdminControlRoom() {
   
   const [formData, setFormData] = useState({
     batch_number: "",
-    product_name: "Industrial Wheat Bran",
+    product_name: "", // Now blank so you can type any commodity
     origin: "", 
-    current_location: "Mill Gate",
+    current_location: "Manufacturer Gate",
     status: "Quality Certified",
-    protein_percent: "14.5",
-    moisture_percent: "12.5"
+    protein_percent: "",
+    moisture_percent: ""
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -40,7 +39,7 @@ export default function AdminControlRoom() {
         .upsert(
           {
             batch_number: cleanBatchNumber,
-            product_name: formData.product_name,
+            product_name: formData.product_name || "Unspecified Industrial Cargo",
             origin: formData.origin,
             current_location: formData.current_location,
             status: formData.status,
@@ -52,7 +51,6 @@ export default function AdminControlRoom() {
         );
 
       if (error) {
-        // Detailed error logging
         console.error("Supabase Error Details:", error);
         throw new Error(error.message || "Database connection failed");
       }
@@ -60,7 +58,7 @@ export default function AdminControlRoom() {
       setMessage(`SUCCESS: ${cleanBatchNumber} synchronized.`);
     } catch (error: any) {
       console.error("Database Sync Error:", error);
-      setMessage(`ERROR: ${error.message || "Check your Supabase column names"}`);
+      setMessage(`ERROR: ${error.message || "Check your Supabase connection"}`);
     } finally {
       setLoading(false);
       setTimeout(() => setMessage(""), 5000);
@@ -77,8 +75,12 @@ export default function AdminControlRoom() {
             ADMIN <span className="text-red-500 font-light italic">COMMAND</span>
           </h1>
           <p className="text-[10px] text-red-700 mt-2 uppercase tracking-[0.4em] font-black">
-            SeireiYoki Audit Protocol v2.6
+            SeireiYoki Industrial Audit Protocol
           </p>
+        </div>
+        <div className="hidden md:flex items-center gap-2 text-[10px] text-gray-600 uppercase tracking-widest bg-gray-950 px-4 py-2 border border-gray-900 rounded">
+          <RefreshCcw className="w-3 h-3 animate-spin-slow" />
+          Live Ledger Sync: Active
         </div>
       </header>
 
@@ -86,8 +88,8 @@ export default function AdminControlRoom() {
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 via-red-900 to-red-600"></div>
         
         <h2 className="text-lg text-white mb-8 flex items-center gap-3 font-bold tracking-widest uppercase italic">
-          <Wheat className="w-5 h-5 text-red-600" />
-          Update Bran Allocation
+          <Factory className="w-5 h-5 text-red-600" />
+          Update Industrial Allocation
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-8">
@@ -95,41 +97,47 @@ export default function AdminControlRoom() {
             
             <div>
               <label className="text-[10px] text-gray-500 uppercase tracking-widest block mb-2 font-bold">Existing or New Batch ID</label>
-              <input required type="text" name="batch_number" value={formData.batch_number} onChange={handleChange} placeholder="e.g. BR-0033" className="w-full bg-[#050505] border border-gray-800 rounded-lg py-4 px-4 text-white focus:border-red-500 transition-all uppercase font-black text-xl tracking-tighter" />
+              <input required type="text" name="batch_number" value={formData.batch_number} onChange={handleChange} placeholder="e.g. AG-0033" className="w-full bg-[#050505] border border-gray-800 rounded-lg py-4 px-4 text-white focus:border-red-500 transition-all uppercase font-black text-xl tracking-tighter" />
+            </div>
+
+            <div>
+              <label className="text-[10px] text-gray-500 uppercase tracking-widest block mb-2 font-bold">Cargo Classification / Product Name</label>
+              <input required type="text" name="product_name" value={formData.product_name} onChange={handleChange} placeholder="e.g. Premium Fish Feed / Fertilizer" className="w-full bg-[#050505] border border-gray-800 rounded-lg py-4 px-4 text-white focus:border-red-500 font-bold" />
             </div>
 
             <div>
               <label className="text-[10px] text-gray-500 uppercase tracking-widest block mb-2 font-bold">Forensic Transit Node</label>
               <select name="status" value={formData.status} onChange={handleChange} className="w-full bg-[#050505] border border-gray-800 rounded-lg py-4 px-4 text-cyan-500 focus:border-cyan-500 transition-all appearance-none cursor-pointer font-black tracking-widest">
-                <option value="Quality Certified">01: Source Facility (Mill)</option>
+                <option value="Quality Certified">01: Manufacturer / Source Facility</option>
                 <option value="In Transit - Sealed">02: Transit Security (Road)</option>
                 <option value="Delivered - Awaiting Audit">03: Audit Checkpoint (Hub)</option>
-                <option value="Audit Verified">04: Final Off-Take (Farm)</option>
+                <option value="Audit Verified">04: Final Off-Take Verification</option>
               </select>
             </div>
 
             <div>
               <label className="text-[10px] text-gray-500 uppercase tracking-widest block mb-2 font-bold">Physical Hub Name</label>
-              <input required type="text" name="current_location" value={formData.current_location} onChange={handleChange} placeholder="e.g. Apapa Gate" className="w-full bg-[#050505] border border-gray-800 rounded-lg py-4 px-4 text-white" />
+              <input required type="text" name="current_location" value={formData.current_location} onChange={handleChange} placeholder="e.g. Apapa Gate / Ikeja Hub" className="w-full bg-[#050505] border border-gray-800 rounded-lg py-4 px-4 text-white" />
             </div>
 
-            <div>
-              <label className="text-[10px] text-gray-500 uppercase tracking-widest block mb-2 font-bold">Milling Partner</label>
-              <input required type="text" name="origin" value={formData.origin} onChange={handleChange} placeholder="e.g. Honeywell" className="w-full bg-[#050505] border border-gray-800 rounded-lg py-4 px-4 text-white" />
+            <div className="md:col-span-2">
+              <label className="text-[10px] text-gray-500 uppercase tracking-widest block mb-2 font-bold">Manufacturing Partner / Origin</label>
+              <input required type="text" name="origin" value={formData.origin} onChange={handleChange} placeholder="e.g. Grand Cereals / BioVita-Tech" className="w-full bg-[#050505] border border-gray-800 rounded-lg py-4 px-4 text-white" />
             </div>
 
+            {/* Industrial Specs Block */}
             <div className="md:col-span-2 grid grid-cols-2 gap-6 p-6 bg-[#080808] border border-gray-900 rounded-xl">
               <div>
                 <label className="text-[10px] text-cyan-600 uppercase tracking-widest block mb-2 flex items-center gap-2 font-black">
-                  <Activity className="w-3 h-3" /> Crude Protein %
+                  <Activity className="w-3 h-3" /> Primary Metric (e.g. Protein/Nitrogen %)
                 </label>
-                <input step="0.1" type="number" name="protein_percent" value={formData.protein_percent} onChange={handleChange} className="w-full bg-[#050505] border border-gray-800 rounded-lg py-3 px-4 text-white font-black" />
+                <input step="0.1" type="number" name="protein_percent" value={formData.protein_percent} onChange={handleChange} placeholder="e.g. 14.5" className="w-full bg-[#050505] border border-gray-800 rounded-lg py-3 px-4 text-white font-black" />
               </div>
               <div>
                 <label className="text-[10px] text-emerald-600 uppercase tracking-widest block mb-2 flex items-center gap-2 font-black">
-                  <Droplets className="w-3 h-3" /> Moisture %
+                  <Droplets className="w-3 h-3" /> Secondary Metric (e.g. Moisture/Density %)
                 </label>
-                <input step="0.1" type="number" name="moisture_percent" value={formData.moisture_percent} onChange={handleChange} className="w-full bg-[#050505] border border-gray-800 rounded-lg py-3 px-4 text-white font-black" />
+                <input step="0.1" type="number" name="moisture_percent" value={formData.moisture_percent} onChange={handleChange} placeholder="e.g. 12.5" className="w-full bg-[#050505] border border-gray-800 rounded-lg py-3 px-4 text-white font-black" />
               </div>
             </div>
           </div>
