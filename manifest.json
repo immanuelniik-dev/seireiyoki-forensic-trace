@@ -1,7 +1,7 @@
 {
   "name": "SeireiYoki Forensic",
   "short_name": "SeireiYoki",
-  "description": "Industrial Bran Supply Chain Audit Terminal",
+  "description": "Industrial Logistics & Integrity Ledger",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#050505",
