@@ -1,16 +1,19 @@
 import withPWAInit from "@ducanh2912/next-pwa";
 
+/** @type {import('next').NextConfig} */
 const withPWA = withPWAInit({
   dest: "public",
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
   sw: "sw.js",
+  // PWA is disabled in dev to speed up refresh times
   disable: process.env.NODE_ENV === "development",
 });
 
 const nextConfig = {
-  // We keep the webpack force here just to be safe
+  // We removed the 'turbopack' key from here as it is no longer supported in v16.2.1
+  // The --webpack flag in package.json handles the engine selection.
   webpack: (config: any) => {
     return config;
   },
