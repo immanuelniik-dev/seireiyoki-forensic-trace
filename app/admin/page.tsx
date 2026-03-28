@@ -6,8 +6,9 @@ import { createClient } from "@supabase/supabase-js";
 import { 
   ShieldCheck, Save, Factory, Droplets, 
   Globe, CheckCircle, RefreshCcw, 
-  AlertTriangle, LogOut, Lock 
+  AlertTriangle, LogOut, Lock, ExternalLink
 } from "lucide-react";
+import Link from "next/link";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
@@ -79,7 +80,7 @@ export default function AuthenticationControl() {
       setMessage(`ERROR: ${error.message}`);
     } finally {
       setLoading(false);
-      setTimeout(() => setMessage(""), 5000);
+      // We don't clear the message immediately so the Driver Link remains visible
     }
   };
 
@@ -154,9 +155,23 @@ export default function AuthenticationControl() {
           </div>
 
           <div className="mt-12 pt-10 border-t border-gray-900 flex flex-col md:flex-row items-center justify-between gap-8">
-            <div className={`text-[10px] font-black tracking-[0.3em] uppercase px-5 py-2.5 rounded-xl border ${message.includes('ERROR') ? 'text-red-500 bg-red-950/10 border-red-900/40' : 'text-cyan-500 bg-cyan-950/10 border-cyan-900/40'}`}>
-              {message || "Terminal Status: Ready"}
+            <div className="flex flex-col gap-4">
+              <div className={`text-[10px] font-black tracking-[0.3em] uppercase px-5 py-2.5 rounded-xl border ${message.includes('ERROR') ? 'text-red-500 bg-red-950/10 border-red-900/40' : 'text-cyan-500 bg-cyan-950/10 border-cyan-900/40'}`}>
+                {message || "Terminal Status: Ready"}
+              </div>
+              
+              {/* NEW: DRIVER TERMINAL LINK GENERATOR */}
+              {message.includes('AUTHENTICATED') && (
+                <Link 
+                  href={`/driver/${formData.batch_number.toUpperCase()}`}
+                  target="_blank"
+                  className="inline-flex items-center gap-2 text-cyan-400 hover:text-white transition-all text-[9px] uppercase font-black tracking-widest"
+                >
+                  <ExternalLink className="w-3 h-3" /> Open Driver Stealth Terminal
+                </Link>
+              )}
             </div>
+
             <button disabled={loading} type="submit" className="w-full md:w-auto bg-cyan-950 hover:bg-cyan-600 text-cyan-100 border border-cyan-800 px-14 py-6 rounded-2xl uppercase tracking-[0.4em] text-xs font-black flex items-center justify-center gap-5 transition-all active:scale-95 shadow-[0_15px_40px_rgba(6,182,212,0.15)]">
               {loading ? <RefreshCcw className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
               {loading ? "AUTHENTICATING..." : "AUTHORIZE SHIPMENT"}

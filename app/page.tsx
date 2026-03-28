@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ShieldCheck, Factory, Box, Activity, Download, Globe, Lock } from "lucide-react";
+import { 
+  Search, ShieldCheck, Download, Globe, Lock, Activity 
+} from "lucide-react";
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -39,7 +41,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-6 selection:bg-cyan-900 selection:text-white relative overflow-hidden">
+    <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-6 selection:bg-cyan-900 selection:text-white relative overflow-hidden font-mono">
       
       {/* Background Tech Grid */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(6,182,212,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(6,182,212,0.02)_1px,transparent_1px)] bg-[size:50px_50px] pointer-events-none"></div>
@@ -67,32 +69,36 @@ export default function Home() {
             Industrial Logistics <br />
             <span className="text-cyan-500 italic">& Integrity Ledger</span>
           </h1>
-          <p className="text-[10px] md:text-xs text-gray-400 uppercase tracking-[0.5em] font-black">
-            SeireiYoki Supply Chain Authentication
+          <p className="text-[10px] md:text-xs text-gray-500 uppercase tracking-[0.4em] font-black">
+            SeireiYoki Supply Chain Authentication Protocol
           </p>
         </div>
 
+        {/* SEARCH INTERFACE */}
         <form onSubmit={handleSearch} className="relative group">
           <div className="absolute inset-y-0 left-0 pl-7 flex items-center pointer-events-none">
-            <Search className="h-6 w-6 text-cyan-800 group-focus-within:text-cyan-400 transition-colors" />
+             <div className="h-2 w-2 rounded-full bg-cyan-900 group-focus-within:bg-cyan-400 transition-colors animate-pulse"></div>
           </div>
           <input
             type="text"
-            className="block w-full pl-16 pr-6 py-7 bg-[#080808] border-2 border-gray-900 rounded-3xl text-xl text-white placeholder-gray-800 focus:outline-none focus:border-cyan-600 focus:ring-1 focus:ring-cyan-600 transition-all uppercase tracking-[0.25em] font-black shadow-2xl"
+            className="block w-full pl-14 pr-20 py-7 bg-[#080808] border-2 border-gray-900 rounded-3xl text-xl text-white placeholder-gray-800 focus:outline-none focus:border-cyan-600 focus:ring-1 focus:ring-cyan-600 transition-all uppercase tracking-[0.25em] font-black shadow-2xl"
             placeholder="ENTER BATCH ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             required
           />
+          
+          {/* CLICKABLE ICON BUTTON */}
           <button
             type="submit"
-            className="absolute right-4 top-4 bottom-4 bg-cyan-950 hover:bg-cyan-500 hover:text-black text-cyan-400 border border-cyan-800 px-10 rounded-2xl font-black uppercase tracking-widest text-[11px] transition-all active:scale-95 flex items-center gap-3 shadow-lg"
+            className="absolute right-4 top-1/2 -translate-y-1/2 p-4 text-cyan-900 hover:text-cyan-400 hover:scale-110 active:scale-95 transition-all bg-transparent border-none cursor-pointer"
+            aria-label="Search"
           >
-            <ShieldCheck className="w-4 h-4" /> Verify
+            <Search className="w-8 h-8" />
           </button>
         </form>
 
-        <div className="mt-20 grid grid-cols-3 gap-10 border-t border-gray-900/60 pt-12">
+        <div className="mt-20 grid grid-cols-3 gap-10 border-t border-gray-900/60 pt-12 pb-20">
           <div className="text-center space-y-4">
             <Globe className="w-6 h-6 text-gray-700 mx-auto" />
             <p className="text-[9px] text-gray-600 uppercase tracking-widest font-black leading-tight">Global <br/> Standards</p>
