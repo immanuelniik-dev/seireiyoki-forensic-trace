@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "SEIREIYOKI | Supply Chain Authentication",
-  description: "Industrial Logistics & Integrity Ledger - Secure Supply Chain Traceability by Yoki Technology Limited",
+  description: "Industrial Logistics & Integrity Ledger - Secure Supply Chain Traceability by SeireiYoki Technology Limited",
   manifest: "/manifest.json",
   icons: {
     icon: "/icon.svg",
@@ -58,7 +58,7 @@ export default function RootLayout({
                 <span className="text-white font-bold ml-1 border-b border-cyan-900/50 uppercase italic">
                   Conseillier Enterprises
                 </span>. 
-                Unauthorized access to the Integrity Ledger is strictly prohibited by Global Logistics Protocol.
+                Unauthorized access is strictly prohibited by Global Logistics Protocol.
               </p>
             </div>
             

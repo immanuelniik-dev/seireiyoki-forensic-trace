@@ -1,180 +1,167 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { 
-  ShieldCheck, Save, Factory, Droplets, 
-  Globe, CheckCircle, RefreshCcw, 
-  AlertTriangle, LogOut, Lock, ExternalLink
+  ShieldCheck, Globe, RefreshCcw, 
+  LogOut, Lock, ExternalLink, Truck, Search, RotateCcw, AlertTriangle
 } from "lucide-react";
 import Link from "next/link";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+);
 
 export default function AuthenticationControl() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [isAuth, setIsAuth] = useState(false);
   const [message, setMessage] = useState("");
+  const [exists, setExists] = useState(false);
   
   const [formData, setFormData] = useState({
     batch_number: "",
     product_name: "",
     origin: "", 
     current_location: "Processing Facility",
-    status: "Quality Certified",
-    protein_percent: "",
-    moisture_percent: ""
+    status: "Quality Certified"
   });
 
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push("/login");
-      } else {
-        setIsAuth(true);
-      }
+      if (!session) router.push("/login");
+      else setIsAuth(true);
     };
     checkSession();
   }, [router]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push("/login");
+  const checkExistingBatch = useCallback(async (id: string) => {
+    if (id.length < 3) return;
+    
+    const { data } = await supabase
+      .from("batches")
+      .select("*")
+      .eq("batch_number", id.toUpperCase().trim())
+      .maybeSingle();
+
+    if (data) {
+      setFormData({
+        batch_number: data.batch_number,
+        product_name: data.product_name || "",
+        origin: data.origin || "",
+        current_location: data.current_location || "",
+        status: data.status || "Quality Certified"
+      });
+      setExists(true);
+      setMessage(data.status === "Audit Verified" ? "NODE EXPIRED: Verification Complete." : "MATCH FOUND: Active Record.");
+    } else {
+      setExists(false);
+      setMessage("");
+    }
+  }, []);
+
+  const handleReset = async () => {
+    setLoading(true);
+    const { error } = await supabase
+      .from("batches")
+      .update({ status: "In Transit - Sealed", current_location: "Transit Authorization Reset" })
+      .eq("batch_number", formData.batch_number);
+    
+    if (!error) {
+      setFormData(prev => ({ ...prev, status: "In Transit - Sealed" }));
+      setMessage("SUCCESS: Terminal Authorization Restored.");
+    }
+    setLoading(false);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (name === "batch_number") checkExistingBatch(value);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setMessage("Authenticating Batch Data...");
-
     try {
-      const cleanBatchNumber = formData.batch_number.toUpperCase().trim();
+      const cleanID = formData.batch_number.toUpperCase().trim();
       const { error } = await supabase
         .from("batches")
-        .upsert(
-          {
-            batch_number: cleanBatchNumber,
-            product_name: formData.product_name || "Industrial Consignment",
-            origin: formData.origin,
-            current_location: formData.current_location,
-            status: formData.status,
-            protein_percent: formData.protein_percent ? parseFloat(formData.protein_percent) : null,
-            moisture_percent: formData.moisture_percent ? parseFloat(formData.moisture_percent) : null,
-            last_updated: new Date().toISOString(),
-          },
-          { onConflict: 'batch_number' } 
-        );
-
+        .upsert({ ...formData, batch_number: cleanID, last_updated: new Date().toISOString() }, { onConflict: 'batch_number' });
       if (error) throw error;
-      setMessage(`AUTHENTICATED: ${cleanBatchNumber} synchronized.`);
-    } catch (error: any) {
-      setMessage(`ERROR: ${error.message}`);
-    } finally {
-      setLoading(false);
-      // We don't clear the message immediately so the Driver Link remains visible
-    }
+      setMessage(`SUCCESS: ${cleanID} updated.`);
+      setExists(true);
+    } catch (err: any) { setMessage(`ERROR: ${err.message}`); }
+    finally { setLoading(false); }
   };
 
   if (!isAuth) return null;
 
   return (
-    <div className="min-h-screen bg-[#050505] text-gray-300 font-mono p-6 md:p-12 selection:bg-cyan-900 selection:text-white">
-      
-      <header className="mb-10 border-b border-gray-900/60 pb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-black text-white tracking-tighter flex items-center gap-3 uppercase">
-            <Lock className="text-cyan-500 w-8 h-8" />
-            Authentication <span className="text-cyan-500 font-light italic text-2xl">Control</span>
-          </h1>
-          <p className="text-[10px] text-gray-600 mt-2 uppercase tracking-[0.5em] font-black">
-            Personnel: Secure Access Active
-          </p>
-        </div>
-        
-        <button 
-          onClick={handleLogout}
-          className="flex items-center gap-2 text-[10px] text-red-900 hover:text-red-500 transition-colors uppercase tracking-widest font-black border border-red-950/30 px-5 py-2 rounded-xl bg-red-950/5"
-        >
-          <LogOut className="w-3 h-3" /> Terminate Session
-        </button>
+    <div className="min-h-screen bg-[#050505] text-gray-300 font-mono p-6 md:p-12">
+      <header className="mb-10 border-b border-gray-900/60 pb-8 flex justify-between items-center">
+        <h1 className="text-xl font-black text-white uppercase italic tracking-tighter flex items-center gap-2">
+          <Lock className="text-cyan-500 w-5 h-5" /> Authentication <span className="text-cyan-500 font-light">Control</span>
+        </h1>
+        <button onClick={() => supabase.auth.signOut().then(() => router.push("/login"))} className="text-[10px] text-red-900 font-black uppercase tracking-widest">Logout</button>
       </header>
 
-      <div className="max-w-4xl bg-[#080808] border border-gray-900 rounded-[2.5rem] p-10 relative overflow-hidden shadow-2xl mx-auto">
+      <div className="max-w-4xl bg-[#080808] border border-gray-900 rounded-[2.5rem] p-10 relative shadow-2xl mx-auto overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-cyan-600 shadow-[0_0_20px_rgba(6,182,212,0.4)]"></div>
         
-        <div className="flex justify-between items-center mb-10">
-          <h2 className="text-lg text-white flex items-center gap-4 font-black tracking-widest uppercase italic">
-            <Globe className="w-5 h-5 text-cyan-500" />
-            Consignment Registration
-          </h2>
-          <div className="flex items-center gap-2 text-[8px] text-cyan-500 uppercase tracking-widest bg-cyan-950/20 px-4 py-1.5 rounded-full border border-cyan-900/40">
-            <ShieldCheck className="w-2.5 h-2.5" /> Encryption Active
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-            <div>
-              <label className="text-[10px] text-gray-600 uppercase tracking-widest block mb-3 font-black">Consignment ID</label>
-              <input required type="text" name="batch_number" value={formData.batch_number} onChange={handleChange} className="w-full bg-[#050505] border border-gray-800 rounded-2xl py-5 px-6 text-white focus:border-cyan-600 transition-all uppercase font-black text-2xl tracking-tighter shadow-inner" />
+        <form onSubmit={handleSubmit} className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="relative">
+              <label className="text-[9px] text-gray-600 uppercase tracking-[0.3em] block mb-3 font-black">Consignment ID</label>
+              <input required type="text" name="batch_number" value={formData.batch_number} onChange={handleChange} className="w-full bg-[#050505] border border-gray-800 rounded-2xl py-5 px-6 text-white uppercase font-black text-xl tracking-tighter focus:border-cyan-600 outline-none transition-all" />
+              <Search className={`absolute right-6 top-[55px] w-5 h-5 ${exists ? "text-cyan-500" : "text-gray-900"}`} />
             </div>
 
             <div>
-              <label className="text-[10px] text-gray-600 uppercase tracking-widest block mb-3 font-black">Cargo Classification</label>
-              <input required type="text" name="product_name" value={formData.product_name} onChange={handleChange} placeholder="e.g. Industrial Premix" className="w-full bg-[#050505] border border-gray-800 rounded-2xl py-5 px-6 text-white focus:border-cyan-600 font-bold shadow-inner" />
+              <label className="text-[9px] text-gray-600 uppercase tracking-[0.3em] block mb-3 font-black">Classification</label>
+              <input required type="text" name="product_name" value={formData.product_name} onChange={handleChange} className="w-full bg-[#050505] border border-gray-800 rounded-2xl py-5 px-6 text-white font-bold" />
             </div>
 
             <div>
-              <label className="text-[10px] text-gray-600 uppercase tracking-widest block mb-3 font-black">Authentication Node</label>
-              <select name="status" value={formData.status} onChange={handleChange} className="w-full bg-[#050505] border border-gray-800 rounded-2xl py-5 px-6 text-cyan-500 focus:border-cyan-500 appearance-none cursor-pointer font-black tracking-widest shadow-inner">
-                <option value="Quality Certified">01: Dispatch Origin</option>
-                <option value="In Transit - Sealed">02: Transit Security</option>
-                <option value="Delivered - Awaiting Audit">03: Hub Verification</option>
-                <option value="Audit Verified">04: Handover Authenticated</option>
+              <label className="text-[9px] text-gray-600 uppercase tracking-[0.3em] block mb-3 font-black">System Status</label>
+              <select name="status" value={formData.status} onChange={handleChange} className="w-full bg-[#050505] border border-gray-800 rounded-2xl py-5 px-6 text-cyan-500 font-black appearance-none">
+                <option value="Quality Certified">01: Origin</option>
+                <option value="In Transit - Sealed">02: Transit</option>
+                <option value="Audit Verified">03: Handover (EXPIRES LINK)</option>
               </select>
             </div>
 
             <div>
-              <label className="text-[10px] text-gray-600 uppercase tracking-widest block mb-3 font-black">Physical Geo-Location</label>
-              <input required type="text" name="current_location" value={formData.current_location} onChange={handleChange} className="w-full bg-[#050505] border border-gray-800 rounded-2xl py-5 px-6 text-white shadow-inner" />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="text-[10px] text-gray-600 uppercase tracking-widest block mb-3 font-black">Manufacturing Source</label>
-              <input required type="text" name="origin" value={formData.origin} onChange={handleChange} className="w-full bg-[#050505] border border-gray-800 rounded-2xl py-5 px-6 text-white shadow-inner" />
+              <label className="text-[9px] text-gray-600 uppercase tracking-[0.3em] block mb-3 font-black">Current Location</label>
+              <input required type="text" name="current_location" value={formData.current_location} onChange={handleChange} className="w-full bg-[#050505] border border-gray-800 rounded-2xl py-5 px-6 text-white" />
             </div>
           </div>
 
-          <div className="mt-12 pt-10 border-t border-gray-900 flex flex-col md:flex-row items-center justify-between gap-8">
-            <div className="flex flex-col gap-4">
-              <div className={`text-[10px] font-black tracking-[0.3em] uppercase px-5 py-2.5 rounded-xl border ${message.includes('ERROR') ? 'text-red-500 bg-red-950/10 border-red-900/40' : 'text-cyan-500 bg-cyan-950/10 border-cyan-900/40'}`}>
-                {message || "Terminal Status: Ready"}
+          <div className="mt-10 pt-8 border-t border-gray-900 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex flex-col gap-3 w-full md:w-auto">
+              <div className={`text-[9px] font-black tracking-widest uppercase px-4 py-2 rounded-lg border ${formData.status === "Audit Verified" ? "text-red-500 bg-red-950/10 border-red-900/30" : "text-cyan-500 bg-cyan-950/10 border-cyan-900/30"}`}>
+                {message || "Terminal Ready"}
               </div>
-              
-              {/* NEW: DRIVER TERMINAL LINK GENERATOR */}
-              {message.includes('AUTHENTICATED') && (
-                <Link 
-                  href={`/driver/${formData.batch_number.toUpperCase()}`}
-                  target="_blank"
-                  className="inline-flex items-center gap-2 text-cyan-400 hover:text-white transition-all text-[9px] uppercase font-black tracking-widest"
-                >
-                  <ExternalLink className="w-3 h-3" /> Open Driver Stealth Terminal
+
+              {/* ACTION BUTTONS FOR EXPIRED NODES */}
+              {formData.status === "Audit Verified" && (
+                <button type="button" onClick={handleReset} className="flex items-center gap-2 text-[9px] text-orange-500 hover:text-orange-400 font-black uppercase tracking-widest transition-all">
+                  <RotateCcw className="w-3 h-3" /> Reactivate Driver Terminal
+                </button>
+              )}
+
+              {exists && formData.status !== "Audit Verified" && (
+                <Link href={`/driver/${formData.batch_number}`} target="_blank" className="flex items-center gap-2 text-[9px] text-cyan-400 hover:text-white font-black uppercase tracking-widest">
+                  <ExternalLink className="w-3 h-3" /> Live Driver Terminal Active
                 </Link>
               )}
             </div>
 
-            <button disabled={loading} type="submit" className="w-full md:w-auto bg-cyan-950 hover:bg-cyan-600 text-cyan-100 border border-cyan-800 px-14 py-6 rounded-2xl uppercase tracking-[0.4em] text-xs font-black flex items-center justify-center gap-5 transition-all active:scale-95 shadow-[0_15px_40px_rgba(6,182,212,0.15)]">
-              {loading ? <RefreshCcw className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
-              {loading ? "AUTHENTICATING..." : "AUTHORIZE SHIPMENT"}
+            <button disabled={loading} type="submit" className="w-full md:w-auto bg-cyan-950 hover:bg-cyan-600 text-white px-10 py-5 rounded-2xl uppercase tracking-[0.4em] text-[10px] font-black transition-all active:scale-95 shadow-xl">
+              {loading ? "SYNCING..." : exists ? "UPDATE LEDGER" : "CREATE LEDGER"}
             </button>
           </div>
         </form>

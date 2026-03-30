@@ -82,7 +82,7 @@ export default function Home() {
           <input
             type="text"
             className="block w-full pl-14 pr-20 py-7 bg-[#080808] border-2 border-gray-900 rounded-3xl text-xl text-white placeholder-gray-800 focus:outline-none focus:border-cyan-600 focus:ring-1 focus:ring-cyan-600 transition-all uppercase tracking-[0.25em] font-black shadow-2xl"
-            placeholder="ENTER BATCH ID..."
+            placeholder="BATCH ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             required
