@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="576" viewBox="0 0 1024 576">
+  <defs>
+    <pattern id="bgPattern" patternUnits="userSpaceOnUse" width="200" height="200">
+      <image x="0" y="0" width="200" height="200" xlink:href="data:image/jpeg;base64,...(JPEG or PNG data for the textured paper background)..."/>
+    </pattern>
+    <filter id="distressFilter">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.1 0 0 0 0 0.2 0 0 0 0 0.4 0 0 0 1 0"/>
+      <feComposite operator="in" in2="SourceGraphic"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="576" fill="url(#bgPattern)" />
+
+  <g transform="translate(512, 288)" filter="url(#distressFilter)">
+    <circle cx="0" cy="0" r="230" fill="none" stroke="#1c417c" stroke-width="4" stroke-dasharray="8 8"/>
+    <circle cx="0" cy="0" r="215" fill="none" stroke="#1c417c" stroke-width="6"/>
+
+    <defs>
+      <path id="topTextPath" d="M -160 -160 A 215 215 0 0 1 160 -160"/>
+    </defs>
+    <text font-family="Verdana, sans-serif" font-size="34" font-weight="bold" fill="#1c417c" letter-spacing="3" text-anchor="middle">
+      <textPath xlink:href="#topTextPath" startOffset="50%">VERIFIED BY</textPath>
+    </text>
+
+    <defs>
+      <path id="bottomTextPath" d="M -215 15 A 215 215 0 0 0 215 15"/>
+    </defs>
+    <text font-family="Verdana, sans-serif" font-size="32" font-weight="bold" fill="#1c417c" letter-spacing="3" text-anchor="middle">
+      <textPath xlink:href="#bottomTextPath" startOffset="50%">SEIREIYOKI TECH LTD</textPath>
+    </text>
+
+    <polygon points="-190,-6 -192,-1 -198,-1 -194,3 -195,8 -190,5 -185,8 -186,3 -182,-1 -188,-1" fill="#1c417c"/> <polygon points="190,-6 188,-1 182,-1 186,3 185,8 190,5 195,8 194,3 198,-1 192,-1" fill="#1c417c"/> <circle cx="0" cy="0" r="145" fill="none" stroke="#1c417c" stroke-width="2" stroke-dasharray="4 4"/>
+
+    <g transform="translate(-65, -110) scale(0.6)">
+      <path d="M 0 0 L 100 0 L 120 40 L 40 80 Z" fill="#1c417c"/> <path d="M 100 0 L 200 0 L 180 60 L 120 40 Z" fill="#1c417c"/>
+      <path d="M 180 60 L 200 0 L 220 120 L 160 80 Z" fill="#1c417c"/>
+      <text x="145" y="55" font-family="Verdana, sans-serif" font-size="16" font-weight="bold" fill="#1c417c">SY</text>
+    </g>
+
+    <g transform="translate(0, 30)">
+      <rect x="-170" y="-12" width="340" height="24" fill="none" stroke="#1c417c" stroke-width="4"/>
+      <text x="0" y="5" font-family="Verdana, sans-serif" font-size="20" font-weight="bold" fill="#1c417c" text-anchor="middle" letter-spacing="1">AUDITED &amp; VERIFIED</text>
+      <text x="0" y="32" font-family="Verdana, sans-serif" font-size="12" font-weight="bold" fill="#1c417c" text-anchor="middle">LAGOS, NIGERIA</text>
+    </g>
+
+  </g>
+</svg>

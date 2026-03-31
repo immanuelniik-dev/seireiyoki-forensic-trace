@@ -5,7 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import { 
   ShieldCheck, Activity, ArrowLeft, 
   Truck, AlertTriangle, CheckCircle2, 
-  Circle, Share2, Lock, Globe, Navigation, Clock, MapPin, Factory, List
+  Circle, Share2, Lock, Globe, Navigation, Clock, MapPin, List
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from 'next/dynamic';
@@ -67,7 +67,6 @@ export default function IndustrialForensicReport({ params }: { params: Promise<{
       }, (payload) => setBatch(payload.new))
       .subscribe();
 
-    // Listen for new history logs in real-time
     const historyChannel = supabase
       .channel('realtime-logs')
       .on('postgres_changes', { 
@@ -103,7 +102,7 @@ export default function IndustrialForensicReport({ params }: { params: Promise<{
     const doc = new jsPDF();
     const timestamp = new Date().toLocaleString();
 
-    // 1. Header
+    // 1. Corporate Header
     doc.setFillColor(5, 5, 5);
     doc.rect(0, 0, 210, 40, 'F');
     doc.setTextColor(0, 182, 212);
@@ -114,12 +113,15 @@ export default function IndustrialForensicReport({ params }: { params: Promise<{
     doc.setTextColor(255, 255, 255);
     doc.text("SUPPLY CHAIN AUTHENTICATION LEDGER", 15, 32);
     
-    // 2. Info
+    // 2. Consignment & Driver Forensic Identity
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
-    doc.text(`CONSIGNMENT ID: ${batch.batch_number}`, 15, 55);
-    doc.text(`PRODUCT: ${batch.product_name}`, 15, 62);
-    doc.text(`STATUS: ${batch.status.toUpperCase()}`, 15, 69);
+    doc.setFont("helvetica", "bold");
+    doc.text(`CONSIGNMENT ID: ${batch.batch_number}`, 15, 52);
+    doc.setFont("helvetica", "normal");
+    doc.text(`PRODUCT: ${batch.product_name}`, 15, 58);
+    doc.text(`DRIVER: ${batch.driver_name || 'NOT ASSIGNED'}`, 15, 64);
+    doc.text(`CONTACT: ${batch.driver_phone || 'N/A'}`, 15, 70);
     doc.text(`REPORT GENERATED: ${timestamp}`, 15, 76);
 
     // 3. Milestone Summary Table
@@ -134,39 +136,39 @@ export default function IndustrialForensicReport({ params }: { params: Promise<{
       headStyles: { fillColor: [15, 15, 15], textColor: [0, 182, 212] },
     });
 
-    // 4. HISTORICAL AUDIT TRAIL (TEXT-BASED)
-    const historyRows = history.map((log, index) => [
-      index + 1,
-      new Date(log.created_at).toLocaleString(),
-      `${log.latitude.toFixed(4)}, ${log.longitude.toFixed(4)}`,
-      "SATELLITE VERIFIED"
-    ]);
-
-    doc.setFont("helvetica", "bold");
-    doc.text("DETAILED HISTORICAL BREADCRUMBS", 15, (doc as any).lastAutoTable.finalY + 15);
-
-    autoTable(doc, {
-      startY: (doc as any).lastAutoTable.finalY + 20,
-      head: [['#', 'DATETIME', 'COORDINATES', 'METHOD']],
-      body: historyRows,
-      theme: 'striped',
-      headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
-      styles: { fontSize: 8 }
-    });
-
-    // 5. Company Stamp
-    const finalY = (doc as any).lastAutoTable.finalY + 25;
-    if (finalY < 250) {
-        doc.setDrawColor(0, 182, 212);
-        doc.setLineWidth(0.8);
-        doc.circle(170, finalY, 18, 'S');
-        doc.setFontSize(7);
-        doc.text("AUTHENTICATED", 157, finalY - 2);
-        doc.text("SEIREIYOKI", 161, finalY + 2);
-        doc.text("LOGISTICS", 162, finalY + 6);
+    // 4. Historical Logs Table
+    if (history.length > 0) {
+      const historyRows = history.map((log, index) => [
+        index + 1,
+        new Date(log.created_at).toLocaleString(),
+        `${log.latitude.toFixed(4)}, ${log.longitude.toFixed(4)}`,
+        "SATELLITE VERIFIED"
+      ]);
+      doc.setFont("helvetica", "bold");
+      doc.text("DETAILED HISTORICAL BREADCRUMBS", 15, (doc as any).lastAutoTable.finalY + 15);
+      autoTable(doc, {
+        startY: (doc as any).lastAutoTable.finalY + 20,
+        head: [['#', 'DATETIME', 'COORDINATES', 'METHOD']],
+        body: historyRows,
+        theme: 'striped',
+        headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
+        styles: { fontSize: 8 }
+      });
     }
 
-    doc.save(`SeireiYoki_Audit_${batch.batch_number}.pdf`);
+    // 5. OFFICIAL COMPANY STAMP (SVG)
+    const stampWidth = 40;
+    const stampHeight = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.addImage('/seireiyoki-stamp.svg', 'SVG', pageWidth - stampWidth - 15, pageHeight - stampHeight - 20, stampWidth, stampHeight);
+
+    // 6. Legal Footer
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text("This document is a legally binding digital twin of the physical cargo ledger, verified by SEIREIYOKI TECH LTD.", 15, 285);
+
+    doc.save(`SeireiYoki_Ledger_${batch.batch_number}.pdf`);
   };
 
   if (loading) return <div className="min-h-screen bg-[#050505] flex items-center justify-center font-mono"><Activity className="w-10 h-10 text-cyan-500 animate-spin" /></div>;
@@ -187,13 +189,10 @@ export default function IndustrialForensicReport({ params }: { params: Promise<{
       {/* Top Nav */}
       <div className="flex justify-between items-center mb-10 border-b border-gray-900/40 pb-6">
         <Link href="/" className="text-[10px] tracking-widest uppercase font-black flex items-center gap-2 text-gray-600 hover:text-cyan-500 transition-all">
-          <ArrowLeft className="w-3 h-3" /> Home Terminal
+          <ArrowLeft className="w-3 h-3" /> System Terminal
         </Link>
-        <button onClick={() => {
-            const shareUrl = window.location.href;
-            if (navigator.share) navigator.share({ title: 'SeireiYoki', url: shareUrl });
-        }} className="bg-cyan-950/20 text-cyan-400 border border-cyan-800/40 px-5 py-2 rounded-xl text-[9px] tracking-widest uppercase font-black hover:bg-cyan-500 hover:text-black transition-all flex items-center gap-2">
-            <Share2 className="w-3 h-3" /> Share 
+        <button onClick={() => navigator.share && navigator.share({ url: window.location.href })} className="bg-cyan-950/20 text-cyan-400 border border-cyan-800/40 px-5 py-2 rounded-xl text-[9px] tracking-widest uppercase font-black hover:bg-cyan-500 hover:text-black transition-all flex items-center gap-2 shadow-lg">
+            <Share2 className="w-3 h-3" /> Share Protocol
         </button>
       </div>
 
@@ -226,26 +225,44 @@ export default function IndustrialForensicReport({ params }: { params: Promise<{
                         <p className="text-[9px] text-cyan-500 font-black mt-2 tracking-widest uppercase">ID // {batch.batch_number}</p>
                     </div>
                 </div>
-                {/* Logic to show history or current pos would go into LiveMap component props if needed, but passing batch coords for now */}
-                <LiveMap 
-                  lat={batch.latitude || 6.45} 
-                  lng={batch.longitude || 3.60} 
-                  label={batch.batch_number} 
-                  history={history}           // Pass the history array
-                  showHistory={showHistory}    // Pass the toggle state
-                />
+                <LiveMap lat={batch.latitude || 6.45} lng={batch.longitude || 3.60} label={batch.batch_number} history={history} showHistory={showHistory} />
             </div>
 
-            <div className="bg-[#0a0a0a] p-6 flex items-center gap-5">
+            {/* ADDRESS STRIP */}
+            <div className="bg-[#0a0a0a] p-6 flex items-center gap-5 border-b border-gray-900/50">
                 <div className="bg-cyan-500/10 p-3 rounded-2xl border border-cyan-900/20">
                     <MapPin className="w-5 h-5 text-cyan-500" />
                 </div>
                 <div className="flex-1">
-                    <p className="text-[8px] text-cyan-600 font-black uppercase tracking-[0.3em] mb-1">Current & Last seen Geo-Position Address</p>
-                    <p className="text-[10px] md:text-xs text-gray-300 font-bold leading-relaxed uppercase italic tracking-tight italic">
+                    <p className="text-[8px] text-cyan-600 font-black uppercase tracking-[0.3em] mb-1">Current Geo-Position Address</p>
+                    <p className="text-[10px] md:text-xs text-gray-300 font-bold leading-relaxed uppercase italic tracking-tight">
                         {address}
                     </p>
                 </div>
+            </div>
+
+            {/* DRIVER PROFILE STRIP */}
+            <div className="bg-[#080808] p-6 flex items-center justify-between group">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gray-900 rounded-full flex items-center justify-center border border-gray-800 shadow-inner">
+                        <Truck className="w-5 h-5 text-gray-600 group-hover:text-cyan-500 transition-colors" />
+                    </div>
+                    <div>
+                        <p className="text-[8px] text-gray-600 uppercase tracking-widest font-black mb-1">Assigned Driver</p>
+                        <h4 className="text-sm font-black text-white uppercase italic tracking-tight leading-none">
+                          {batch.driver_name || "PENDING ASSIGNMENT"}
+                        </h4>
+                    </div>
+                </div>
+                
+                {batch.driver_phone && (
+                    <a 
+                        href={`tel:${batch.driver_phone}`}
+                        className="bg-emerald-950/20 text-emerald-500 border border-emerald-900/30 px-6 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500 hover:text-black transition-all flex items-center gap-2 shadow-lg"
+                    >
+                        <Activity className="w-3 h-3" /> Call Driver
+                    </a>
+                )}
             </div>
           </div>
         </div>
@@ -286,7 +303,7 @@ export default function IndustrialForensicReport({ params }: { params: Promise<{
             <div className="mt-12 pt-8 border-t border-gray-900/50 text-center">
                 <button 
                     onClick={generatePDF} 
-                    className="w-full bg-cyan-950/20 hover:bg-cyan-500 hover:text-black border border-cyan-800 py-5 rounded-2xl text-[9px] font-black uppercase tracking-[0.3em] text-cyan-500 transition-all flex items-center justify-center gap-3"
+                    className="w-full bg-cyan-950/20 hover:bg-cyan-500 hover:text-black border border-cyan-800 py-5 rounded-2xl text-[9px] font-black uppercase tracking-[0.3em] text-cyan-500 transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(6,182,212,0.1)]"
                 >
                     <Lock className="w-3 h-3" /> Generate Secure Ledger PDF
                 </button>
