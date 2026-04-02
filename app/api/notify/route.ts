@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Sender Logic (Use 'onboarding@resend.dev' for free tier testing)
-    const sender = 'onboarding@resend.dev';
+    const sender = 'updates@seireiyoki.com.ng';
 
     // 4. Define Email Template based on type
     let subject = '';
