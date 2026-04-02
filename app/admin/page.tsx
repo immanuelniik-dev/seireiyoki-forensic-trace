@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { 
   ShieldCheck, RefreshCcw, LogOut, Lock, 
-  ExternalLink, Truck, Search, RotateCcw, User, Phone
+  ExternalLink, Truck, Search, RotateCcw, User, Phone, Mail
 } from "lucide-react";
 import Link from "next/link";
 
@@ -28,7 +28,9 @@ export default function AuthenticationControl() {
     current_location: "Processing Facility",
     status: "Quality Certified",
     driver_name: "",
-    driver_phone: ""
+    driver_phone: "",
+    buyer_email: "",          // New
+    fleet_manager_email: ""   // New
   });
 
   useEffect(() => {
@@ -58,7 +60,9 @@ export default function AuthenticationControl() {
         current_location: data.current_location || "",
         status: data.status || "Quality Certified",
         driver_name: data.driver_name || "",
-        driver_phone: data.driver_phone || ""
+        driver_phone: data.driver_phone || "",
+        buyer_email: data.buyer_email || "",          // Pulling from DB
+        fleet_manager_email: data.fleet_manager_email || "" // Pulling from DB
       });
       setExists(true);
       setMessage(data.status === "Audit Verified" ? "NODE EXPIRED: Verification Complete." : "MATCH FOUND: Active Record.");
@@ -152,6 +156,21 @@ export default function AuthenticationControl() {
               <input required type="text" name="product_name" value={formData.product_name} onChange={handleChange} className="w-full bg-[#050505] border border-gray-800 rounded-2xl py-5 px-6 text-white font-bold" placeholder="e.g. Fresh Wheat Bran" />
             </div>
 
+            {/* B2B EMAIL CONTACTS */}
+            <div>
+              <label className="text-[9px] text-gray-600 uppercase tracking-[0.3em] block mb-3 font-black flex items-center gap-2">
+                <Mail className="w-3 h-3 text-cyan-600" /> Buyer Email (Recipient)
+              </label>
+              <input required type="email" name="buyer_email" value={formData.buyer_email} onChange={handleChange} className="w-full bg-[#050505] border border-gray-800 rounded-2xl py-5 px-6 text-white font-bold" placeholder="buyer@client.com" />
+            </div>
+
+            <div>
+              <label className="text-[9px] text-gray-600 uppercase tracking-[0.3em] block mb-3 font-black flex items-center gap-2">
+                <Truck className="w-3 h-3 text-cyan-600" /> Fleet Manager Email
+              </label>
+              <input required type="email" name="fleet_manager_email" value={formData.fleet_manager_email} onChange={handleChange} className="w-full bg-[#050505] border border-gray-800 rounded-2xl py-5 px-6 text-white font-bold" placeholder="manager@fleetcompany.com" />
+            </div>
+
             {/* DRIVER DETAILS SECTION */}
             <div className="md:col-span-1">
               <label className="text-[9px] text-gray-600 uppercase tracking-[0.3em] block mb-3 font-black flex items-center gap-2">
@@ -202,13 +221,22 @@ export default function AuthenticationControl() {
 
               {/* LIVE TERMINAL LINK */}
               {exists && formData.status !== "Audit Verified" && (
-                <Link 
-                  href={`/driver/${formData.batch_number.toUpperCase()}`} 
-                  target="_blank" 
-                  className="flex items-center gap-2 text-[9px] text-cyan-400 hover:text-white font-black uppercase tracking-widest bg-cyan-950/10 px-4 py-2 rounded-lg border border-cyan-900/20"
-                >
-                  <ExternalLink className="w-3 h-3" /> Driver Terminal Link
-                </Link>
+                <div className="flex gap-2">
+                   <Link 
+                    href={`/driver/${formData.batch_number.toUpperCase()}`} 
+                    target="_blank" 
+                    className="flex items-center gap-2 text-[9px] text-cyan-400 hover:text-white font-black uppercase tracking-widest bg-cyan-950/10 px-4 py-2 rounded-lg border border-cyan-900/20"
+                  >
+                    <ExternalLink className="w-3 h-3" /> Driver Link
+                  </Link>
+                  <Link 
+                    href={`/fleet/${formData.batch_number.toUpperCase()}`} 
+                    target="_blank" 
+                    className="flex items-center gap-2 text-[9px] text-emerald-400 hover:text-white font-black uppercase tracking-widest bg-emerald-950/10 px-4 py-2 rounded-lg border border-emerald-900/20"
+                  >
+                    <Truck className="w-3 h-3" /> Fleet Link
+                  </Link>
+                </div>
               )}
             </div>
 
