@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Truck, Play, CheckCircle, ArrowLeft, ShieldCheck } from "lucide-react";
+import { Truck, Play, CheckCircle, ArrowLeft, ShieldCheck, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 const supabase = createClient(
@@ -23,9 +23,17 @@ export default function DispatchTerminal({ params }: { params: Promise<{ id: str
     async function init() {
       const { data: { user } } = await supabase.auth.getUser();
       // Load this manager's trucks
-      const { data: fleet } = await supabase.from("fleet_trucks").select("*").eq("owner_email", user?.email);
+      const { data: fleet } = await supabase
+        .from("fleet_trucks")
+        .select("*")
+        .eq("owner_email", user?.email);
+
       // Load current batch status
-      const { data: b } = await supabase.from("batches").select("status, truck_plate").eq("batch_number", batchId).single();
+      const { data: b } = await supabase
+        .from("batches")
+        .select("status, truck_plate")
+        .eq("batch_number", batchId)
+        .single();
       
       if (fleet) setTrucks(fleet);
       if (b) {
@@ -37,26 +45,75 @@ export default function DispatchTerminal({ params }: { params: Promise<{ id: str
   }, [batchId]);
 
   const handleAction = async (newStatus: string) => {
-    if (!selectedPlate && newStatus === "In Transit - Sealed") return alert("Please assign a vehicle plate first.");
+    // Validation
+    if (!selectedPlate && newStatus === "In Transit - Sealed") {
+        return alert("Please assign a vehicle plate first.");
+    }
     
     setLoading(true);
-    const truckData = trucks.find(t => t.plate_number === selectedPlate);
+    console.log(`[DEBUG] Initiating ${newStatus} for Node: ${batchId}`);
 
-    const { error } = await supabase
-      .from("batches")
-      .update({ 
-        status: newStatus,
-        truck_plate: selectedPlate,
-        tracker_device_id: truckData?.tracker_device_id,
-        last_updated: new Date().toISOString()
-      })
-      .eq("batch_number", batchId);
+    try {
+        const truckData = trucks.find(t => t.plate_number === selectedPlate);
 
-    if (!error) {
-      setCurrentStatus(newStatus);
-      // NEXT STEP: Call /api/notify to send Dispatch/Completion Email
+        // 1. UPDATE DATABASE & FETCH RECIPIENT DATA
+        const { data: batchData, error } = await supabase
+          .from("batches")
+          .update({ 
+            status: newStatus,
+            truck_plate: selectedPlate,
+            tracker_device_id: truckData?.tracker_device_id,
+            last_updated: new Date().toISOString()
+          })
+          .eq("batch_number", batchId)
+          .select() // Get the updated record back
+          .single();
+
+        if (error) {
+            console.error("[ERROR] Supabase Update:", error.message);
+            alert("Database update failed. Check console.");
+            setLoading(false);
+            return;
+        }
+
+        console.log("[DEBUG] Database Update Success:", batchData);
+        setCurrentStatus(newStatus);
+
+        // 2. TRIGGER NOTIFICATION API
+        // Check for both buyer_email and generic email columns
+        const recipientEmail = batchData.buyer_email || batchData.email;
+
+        if (!recipientEmail) {
+            console.warn("[WARN] No recipient email found in batch record.");
+            alert("Status updated, but no email was sent (Recipient missing).");
+        } else {
+            console.log("[DEBUG] Triggering API for:", recipientEmail);
+
+            const response = await fetch('/api/notify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: recipientEmail,
+                batchId: batchId,
+                type: newStatus === "In Transit - Sealed" ? "DISPATCH" : "COMPLETED",
+                productName: batchData.product_name,
+                truckPlate: selectedPlate
+              })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                console.log("[DEBUG] Email API Success:", result);
+            } else {
+                console.error("[ERROR] Email API Failed:", result.error);
+            }
+        }
+
+    } catch (err) {
+        console.error("[CRITICAL] handleAction Crash:", err);
+    } finally {
+        setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -76,7 +133,7 @@ export default function DispatchTerminal({ params }: { params: Promise<{ id: str
           <div>
             <label className="text-[8px] text-gray-600 uppercase font-black tracking-widest ml-2 block mb-2">Assign Fleet Vehicle</label>
             <select 
-              disabled={currentStatus === "Audit Verified"}
+              disabled={currentStatus === "Audit Verified" || loading}
               value={selectedPlate}
               onChange={(e) => setSelectedPlate(e.target.value)}
               className="w-full bg-black border border-gray-800 rounded-2xl py-5 px-6 text-xs text-white font-black outline-none focus:border-cyan-500 appearance-none shadow-inner"
@@ -93,7 +150,8 @@ export default function DispatchTerminal({ params }: { params: Promise<{ id: str
             disabled={loading || currentStatus !== "Quality Certified"}
             className="w-full py-6 bg-cyan-500 text-black rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-white transition-all disabled:opacity-20 shadow-lg"
           >
-            <Play className="w-4 h-4" /> Start Dispatch
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+            Start Dispatch
           </button>
 
           <button
@@ -101,7 +159,8 @@ export default function DispatchTerminal({ params }: { params: Promise<{ id: str
             disabled={loading || currentStatus !== "In Transit - Sealed"}
             className="w-full py-6 bg-transparent border border-red-900/40 text-red-600 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-red-600 hover:text-white transition-all disabled:opacity-20"
           >
-            <CheckCircle className="w-4 h-4" /> Confirm Delivery
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+            Confirm Delivery
           </button>
         </div>
 
