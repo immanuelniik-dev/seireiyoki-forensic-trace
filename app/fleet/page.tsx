@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, use } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Truck, LogOut, Activity, ChevronRight, CheckCircle2, ShieldCheck } from "lucide-react";
+import { Truck, Play, CheckCircle, ArrowLeft, ShieldCheck, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 const supabase = createClient(
@@ -11,101 +10,190 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 );
 
-export default function FleetPortal() {
-  const router = useRouter();
-  const [batches, setBatches] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+export default function DispatchTerminal({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
+  // Ensure the ID is clean of spaces and predictable
+  const batchId = resolvedParams.id.trim();
+  
+  const [trucks, setTrucks] = useState<any[]>([]);
+  const [selectedPlate, setSelectedPlate] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState("");
+  const [batchData, setBatchData] = useState<any>(null);
 
   useEffect(() => {
-    async function loadFleetData() {
+    async function init() {
       const { data: { user } } = await supabase.auth.getUser();
       
-      if (!user) {
-        router.push("/login"); // Redirect if not logged in
-        return;
-      }
+      // Load manager's fleet
+      const { data: fleet } = await supabase
+        .from("fleet_trucks")
+        .select("*")
+        .eq("owner_email", user?.email);
 
-      setUserEmail(user.email ?? null);
-
-      // IMPORTANT: The RLS we set up earlier ensures this query 
-      // ONLY returns batches where fleet_manager_email === user.email
-      const { data } = await supabase
+      // FIX: Case-insensitive fetch to handle ID mismatches (CSL-1000 vs csl-1000)
+      const { data: b, error } = await supabase
         .from("batches")
         .select("*")
-        .eq("fleet_manager_email", user.email) 
-        .order("last_updated", { ascending: false });
-
-      if (data) setBatches(data);
-      setLoading(false);
+        .ilike("batch_number", batchId)
+        .maybeSingle();
+      
+      if (error) console.error("Fetch Error:", error.message);
+      
+      if (fleet) setTrucks(fleet);
+      if (b) {
+        setBatchData(b);
+        setCurrentStatus(b.status);
+        setSelectedPlate(b.truck_plate || "");
+        console.log("Terminal Sync Success for Node:", b.batch_number);
+      } else {
+        console.warn("Terminal Sync Failure: No record found for", batchId);
+      }
     }
-    loadFleetData();
-  }, [router]);
+    init();
+  }, [batchId]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push("/login");
+  const handleAction = async (newStatus: string) => {
+    if (!selectedPlate && newStatus === "In Transit - Sealed") {
+        return alert("CRITICAL: Assign a vehicle plate before dispatching.");
+    }
+    
+    setLoading(true);
+    // This alert confirms the JS is actually running in your browser
+    console.log(`[TERMINAL] Triggering ${newStatus} for ${batchId}`);
+
+    try {
+        const truckData = trucks.find(t => t.plate_number === selectedPlate);
+
+        // 1. UPDATE DATABASE WITH CASE-INSENSITIVE MATCH
+        const { data: updatedBatch, error } = await supabase
+          .from("batches")
+          .update({ 
+            status: newStatus,
+            truck_plate: selectedPlate,
+            tracker_device_id: truckData?.tracker_device_id || null,
+            last_updated: new Date().toISOString()
+          })
+          .ilike("batch_number", batchId) // The Fix
+          .select() 
+          .single();
+
+        if (error) {
+            throw new Error(error.message);
+        }
+
+        if (!updatedBatch) {
+            alert("SECURITY ERROR: Batch record not found in ledger.");
+            setLoading(false);
+            return;
+        }
+
+        setCurrentStatus(newStatus);
+        setBatchData(updatedBatch);
+
+        // 2. TRIGGER NOTIFICATION
+        // Standardizing to check both 'buyer_email' and 'email' columns
+        const targetEmail = updatedBatch.buyer_email || updatedBatch.email;
+
+        if (!targetEmail) {
+            alert("STATUS UPDATED: No notification sent (Recipient Email missing in DB).");
+        } else {
+            const response = await fetch('/api/notify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: targetEmail,
+                batchId: batchId,
+                type: newStatus === "In Transit - Sealed" ? "DISPATCH" : "COMPLETED",
+                productName: updatedBatch.product_name,
+                truckPlate: selectedPlate
+              })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                alert(`SUCCESS: Node ${batchId} updated. Email sent to ${targetEmail}`);
+            } else {
+                console.error("Notify Error:", result.error);
+                alert("DATABASE UPDATED, but Notification failed. Check Vercel Logs.");
+            }
+        }
+
+    } catch (err: any) {
+        console.error("Terminal Crash:", err);
+        alert("SYSTEM ERROR: " + err.message);
+    } finally {
+        setLoading(false);
+    }
   };
 
-  if (loading) return (
-    <div className="min-h-screen bg-[#050505] flex items-center justify-center">
-      <Activity className="w-8 h-8 text-cyan-500 animate-spin" />
-    </div>
-  );
-
   return (
-    <div className="min-h-screen bg-[#050505] text-gray-300 font-mono p-6 md:p-12">
-      <header className="max-w-5xl mx-auto mb-10 flex justify-between items-start border-b border-gray-900 pb-8">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-             <ShieldCheck className="w-4 h-4 text-cyan-500" />
-             <span className="text-[10px] text-gray-500 uppercase font-black tracking-widest">Authorized Fleet Access</span>
-          </div>
-          <h1 className="text-2xl font-black text-white uppercase italic tracking-tighter">Mission Control</h1>
-          <p className="text-[9px] text-cyan-600 font-black uppercase tracking-[0.4em] mt-1">{userEmail}</p>
-        </div>
+    <div className="min-h-screen bg-[#050505] text-gray-300 font-mono p-6 flex flex-col items-center justify-center">
+      <Link href="/fleet" className="absolute top-10 left-10 text-[9px] uppercase font-black text-gray-600 flex items-center gap-2 hover:text-cyan-500 transition-all">
+        <ArrowLeft className="w-3 h-3" /> Partner Dashboard
+      </Link>
+
+      <div className="w-full max-w-md bg-[#080808] border border-gray-900 rounded-[3rem] p-10 shadow-2xl text-center relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-900 to-transparent"></div>
         
-        <button 
-          onClick={handleLogout}
-          className="bg-red-950/20 text-red-500 border border-red-900/30 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-black transition-all flex items-center gap-2"
-        >
-          <LogOut className="w-3 h-3" /> Terminate
-        </button>
-      </header>
+        <header className="mb-10">
+          <ShieldCheck className="w-12 h-12 text-cyan-900 mx-auto mb-4" />
+          <h2 className="text-xl font-black text-white uppercase italic tracking-tighter">Mission Dispatch</h2>
+          <p className="text-[9px] text-gray-600 tracking-[0.4em] uppercase mt-2">Node Access // {batchId}</p>
+        </header>
 
-      <div className="max-w-5xl mx-auto space-y-4">
-        {batches.length === 0 ? (
-          <div className="text-center py-20 border border-dashed border-gray-900 rounded-[2rem]">
-            <Truck className="w-12 h-12 text-gray-800 mx-auto mb-4" />
-            <p className="text-[10px] text-gray-600 uppercase font-black">No active dispatches assigned to this node.</p>
-          </div>
-        ) : (
-          batches.map((batch) => (
-            <div key={batch.batch_number} className="bg-[#080808] border border-gray-900 rounded-[2rem] p-6 hover:border-cyan-900/50 transition-all group">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div className="flex items-center gap-5">
-                   <div className={`p-4 rounded-2xl border ${batch.status === 'Audit Verified' ? 'bg-emerald-950/10 border-emerald-900/20 text-emerald-500' : 'bg-cyan-950/10 border-cyan-900/20 text-cyan-500'}`}>
-                    {batch.status === 'Audit Verified' ? <CheckCircle2 className="w-5 h-5" /> : <Activity className="w-5 h-5 animate-spin" />}
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-black text-white uppercase tracking-widest">{batch.product_name}</h3>
-                    <p className="text-[9px] text-gray-600 font-black uppercase tracking-widest mt-1">
-                      ID: {batch.batch_number} • {batch.truck_plate || "Awaiting Selection"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <Link 
-                    href={`/fleet/${batch.batch_number}`}
-                    className="bg-cyan-500 text-black px-6 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-white transition-all shadow-lg shadow-cyan-500/10"
-                  >
-                    Control Terminal
-                  </Link>
-                </div>
-              </div>
+        {!batchData && !loading && (
+            <div className="bg-red-950/20 border border-red-900/40 p-4 rounded-2xl mb-6">
+                <p className="text-[9px] text-red-500 font-black uppercase tracking-widest">
+                    Invalid Node: Batch Not Found
+                </p>
             </div>
-          ))
+        )}
+
+        <div className="space-y-6 text-left mb-10">
+          <div>
+            <label className="text-[8px] text-gray-600 uppercase font-black tracking-widest ml-2 block mb-2">Assign Fleet Vehicle</label>
+            <div className="relative">
+                <select 
+                disabled={currentStatus === "Audit Verified" || loading || !batchData}
+                value={selectedPlate}
+                onChange={(e) => setSelectedPlate(e.target.value)}
+                className="w-full bg-black border border-gray-800 rounded-2xl py-5 px-6 text-xs text-white font-black outline-none focus:border-cyan-500 appearance-none shadow-inner cursor-pointer disabled:cursor-not-allowed"
+                >
+                <option value="">SELECT PLATE NUMBER...</option>
+                {trucks.map(t => (
+                    <option key={t.id} value={t.plate_number}>{t.plate_number} ({t.tracker_provider})</option>
+                ))}
+                </select>
+                <Truck className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-700 pointer-events-none" />
+            </div>
+          </div>
+
+          <button
+            onClick={() => handleAction("In Transit - Sealed")}
+            disabled={loading || currentStatus !== "Quality Certified" || !batchData}
+            className="w-full py-6 bg-cyan-600 text-black rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-white transition-all disabled:opacity-20 shadow-lg shadow-cyan-900/10"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+            Authorize Dispatch
+          </button>
+
+          <button
+            onClick={() => handleAction("Audit Verified")}
+            disabled={loading || currentStatus !== "In Transit - Sealed" || !batchData}
+            className="w-full py-6 bg-transparent border border-gray-800 text-gray-500 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:border-emerald-500 hover:text-emerald-500 transition-all disabled:opacity-10"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+            Confirm Delivery
+          </button>
+        </div>
+
+        {currentStatus === "Audit Verified" && (
+          <div className="pt-4 border-t border-gray-900">
+            <p className="text-[9px] text-emerald-500 font-black uppercase tracking-[0.3em] animate-pulse">
+                Handover Authenticated
+            </p>
+          </div>
         )}
       </div>
     </div>

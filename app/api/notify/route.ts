@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Sender Logic (Use 'onboarding@resend.dev' for free tier testing)
-    const sender = 'updates@seireiyoki.com.ng';
+    const sender = 'updates@seirei.com.ng';
 
     // 4. Define Email Template based on type
     let subject = '';
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
           <p>Consignment <strong>${productName}</strong> has been dispatched.</p>
           <p><strong>Tracking ID:</strong> ${batchId}</p>
           <p><strong>Vehicle:</strong> ${truckPlate}</p>
-          <a href="https://seireiyoki.com.ng/batch/${batchId}" 
+          <a href="https://seirei.com.ng/batch/${batchId}" 
              style="display: inline-block; background: #06b6d4; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px; margin-top: 20px;">
              VIEW LIVE TRACKING
           </a>
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
           <h2 style="color: #10b981;">DELIVERY AUTHENTICATED</h2>
           <p>Consignment <strong>${batchId}</strong> has reached its destination.</p>
           <p>The Secure Ledger is now finalized.</p>
-          <a href="https://seireiyoki.com.ng/batch/${batchId}" 
+          <a href="https://seirei.com.ng/batch/${batchId}" 
              style="display: inline-block; background: #10b981; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px; margin-top: 20px;">
              DOWNLOAD FINAL LEDGER
           </a>
