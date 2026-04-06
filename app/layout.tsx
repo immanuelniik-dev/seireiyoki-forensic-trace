@@ -54,17 +54,17 @@ export default function RootLayout({
                 Authentication Secured
               </div>
               <p className="text-xs text-gray-400 font-medium tracking-wide max-w-md leading-relaxed">
-                SeireiYoki Technology Limited is a proprietary subsidiary of 
+                SeireiYoki Technology Limited is a proprietary subsidiary of Conseillier Enterprises.
                 <span className="text-white font-bold ml-1 border-b border-cyan-900/50 uppercase italic">
-                  Conseillier Enterprises
+                  Industrial Supply Chain Forensics
                 </span>. 
-                Unauthorized access is strictly prohibited by Global Logistics Protocol.
+                For partnership inquiries, email : "partnerships@seirei.com.ng".
               </p>
             </div>
             
             <div className="flex flex-col md:items-end gap-2 border-l md:border-l-0 md:border-r border-gray-900 pl-6 md:pl-0 md:pr-6">
               <div className="text-[9px] text-gray-700 uppercase tracking-[0.3em] font-black text-left md:text-right space-y-1">
-                <p>© 2026 YOKI TECHNOLOGY LIMITED</p>
+                <p>© 2026 SEIREIYOKI TECHNOLOGY LIMITED</p>
                 <p className="text-cyan-950">AUTHENTICATION NODE // NIGERIA </p>
                 <p className="opacity-40">LEDGER PROTOCOL v2.6.1</p>
               </div>

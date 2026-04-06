@@ -1,0 +1,8 @@
+# SEIREI BUDGET & PRECISION RULES
+- MODEL: Always default to 'gemini-2.0-flash-lite' unless complex logic is requested.
+- CONTEXT: Do not read the entire project. Only read files I explicitly mention with @.
+- ACTION: If a task requires more than 3 steps, STOP and ask for my 'Budget Approval' before continuing.
+- STYLE: Follow the existing 'Forensic Logistics' theme (Cyan-500, Dark Mode, Mono fonts).
+- DOMAIN: All links must use 'https://www.seirei.com.ng'.
+- LOGIC: Use 'ilike' for all Supabase string queries to avoid case-sensitivity bugs.
+- TERMINATION: Once a specific UI fix or logic update is applied, tell me "Task Complete - Reset Context" so I can start a new chat to save tokens.

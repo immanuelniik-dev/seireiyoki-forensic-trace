@@ -1,4 +1,4 @@
-import withPWAInit from "@ducanh2912/next-pwa";
+const withPWAInit = require("@ducanh2912/next-pwa").default;
 
 /** @type {import('next').NextConfig} */
 const withPWA = withPWAInit({
@@ -14,10 +14,10 @@ const withPWA = withPWAInit({
 const nextConfig = {
   // We removed the 'turbopack' key from here as it is no longer supported in v16.2.1
   // The --webpack flag in package.json handles the engine selection.
-  webpack: (config: any) => {
+  webpack: (config) => {
     return config;
   },
   reactStrictMode: true,
 };
 
-export default withPWA(nextConfig);
+module.exports = withPWA(nextConfig);
