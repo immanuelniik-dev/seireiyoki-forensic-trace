@@ -1,17 +1,25 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.SUPABASE_SERVICE_ROLE_KEY || "" // Use Service Role for bypass RLS
-);
+// FIX: Do not initialize outside the function, as Vercel build will fail 
+// if the environment variables are missing during the build step.
 
 export async function POST(req: Request) {
   try {
+    // Initialize inside the handler
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("Missing Supabase Configuration");
+      return NextResponse.json({ error: "System Configuration Error" }, { status: 500 });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
     const data = await req.json();
 
-    // 1. Extract core telemetry from the hardware packet
-    // Note: Field names may vary by tracker (e.g., 'id' vs 'imei')
+    // 1. Extract core telemetry
     const imei = data.imei || data.id;
     const lat = parseFloat(data.lat || data.latitude);
     const lng = parseFloat(data.lng || data.longitude);
@@ -21,7 +29,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid Forensic Packet" }, { status: 400 });
     }
 
-    // 2. Update the Global Ledger (fleet_trucks table)
+    // 2. Update the Global Ledger
     const { error: updateError } = await supabase
       .from('fleet_trucks')
       .update({
@@ -34,7 +42,7 @@ export async function POST(req: Request) {
 
     if (updateError) throw updateError;
 
-    // 3. Log to historical "Chain of Custody" for audit
+    // 3. Log to historical "Chain of Custody"
     await supabase
       .from('gps_logs')
       .insert([
@@ -49,13 +57,6 @@ export async function POST(req: Request) {
   }
 }
 
-// Support for trackers that use GET (Query Strings) instead of POST
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const imei = searchParams.get('imei');
-  const lat = searchParams.get('lat');
-  const lng = searchParams.get('lng');
-
-  // Re-use the same logic as POST or redirect to a handler
-  return NextResponse.json({ message: "GET Protocol Received. Use POST for high-security." });
+export async function GET() {
+  return NextResponse.json({ message: "Seirei Forensic API Active. Use POST for telemetry." });
 }
