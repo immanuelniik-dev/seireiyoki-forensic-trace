@@ -1,103 +1,67 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import { LogOut, ShieldCheck, Activity, Building2, RefreshCcw } from "lucide-react";
+import { LogOut, ShieldCheck, Activity, Building2, RefreshCcw, ArrowLeft, Mail, Lock } from "lucide-react";
 import Link from "next/link";
-import Footer from "@/components/Footer"; // Using '@' alias is safer for deep paths
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 );
 
-const SUPER_ADMIN_EMAIL = "admin@seirei.com.ng";
-
-export default function OnboardPartner() {
+export default function PartnerOnboarding() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [isAuth, setIsAuth] = useState(false);
-  const [partnerEmail, setPartnerEmail] = useState("");
-  const [companyName, setCompanyName] = useState("");
   const [message, setMessage] = useState("");
-  const [partners, setPartners] = useState<any[]>([]);
-
-  const fetchPartners = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("fleet_trucks")
-      .select("owner_email, company_name, active")
-      .order('owner_email', { ascending: true });
-    
-    if (data) {
-      const uniquePartners = Array.from(
-        new Map(data.map(item => [item.owner_email, item])).values()
-      );
-      setPartners(uniquePartners);
-    }
-    if (error) console.error("Error fetching partners:", error.message);
-    setLoading(false);
-  }, []);
+  
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+    companyName: "",
+  });
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user || user.email !== SUPER_ADMIN_EMAIL) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || session.user.email !== "admin@seirei.com.ng") {
         router.replace("/login");
         return;
       }
-      
       setIsAuth(true);
-      fetchPartners();
     };
     checkSession();
-  }, [router, fetchPartners]);
+  }, [router]);
 
-  const handleOnboardPartner = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage("Authorizing Partner...");
     setLoading(true);
+    setMessage("INITIATING PARTNER NODE...");
 
     try {
-      const { error } = await supabase
-        .from("fleet_trucks")
-        .insert({
-          owner_email: partnerEmail.trim().toLowerCase(),
-          company_name: companyName.trim() || "Independent Partner",
-          plate_number: "SYSTEM-INIT", 
-          tracker_device_id: "PENDING",
-          tracker_provider: "SEIREI_CORE",
-          active: true 
-        });
+      // 1. Create the Auth User
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            company_name: formData.companyName,
+            role: "fleet_manager",
+          }
+        }
+      });
 
-      if (error) throw error;
+      if (authError) throw authError;
+
+      // 2. We don't necessarily need to insert into a profile table if 
+      // your app logic relies on the auth metadata, but we'll add a success message.
+      setMessage(`SUCCESS: ${formData.companyName} ONBOARDED.`);
+      setFormData({ email: "", password: "", companyName: "" });
       
-      setMessage(`SUCCESS: Authorized ${companyName || partnerEmail}`);
-      setPartnerEmail("");
-      setCompanyName("");
-      fetchPartners();
     } catch (err: any) {
       setMessage(`ERROR: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleTogglePartnerStatus = async (email: string, currentStatus: boolean) => {
-    setLoading(true);
-    try {
-      const { error } = await supabase
-        .from("fleet_trucks")
-        .update({ active: !currentStatus })
-        .eq("owner_email", email);
-      
-      if (error) throw error;
-      setMessage(`Partner status updated successfully.`);
-      fetchPartners();
-    } catch (err: any) {
-      setMessage(`Update Failed: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -112,80 +76,93 @@ export default function OnboardPartner() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] flex flex-col">
-      <div className="flex-grow text-gray-300 font-mono p-6 md:p-12">
-        <header className="max-w-6xl mx-auto flex justify-between items-center mb-12 border-b border-gray-900 pb-8">
-          <div>
-            <h1 className="text-2xl font-black text-white uppercase italic tracking-tighter flex items-center gap-2">
-              <Building2 className="text-cyan-500 w-6 h-6" /> Partner <span className="text-cyan-500 font-light">Onboarding</span>
-            </h1>
+    <div className="min-h-screen bg-[#050505] text-gray-300 font-mono p-6 md:p-12 flex flex-col">
+      <header className="max-w-4xl mx-auto w-full mb-10 border-b border-gray-900/60 pb-8 flex justify-between items-center">
+        <Link href="/admin" className="text-[10px] tracking-widest uppercase font-black flex items-center gap-2 text-gray-600 hover:text-cyan-500 transition-all">
+          <ArrowLeft className="w-3 h-3" /> Back to Terminal
+        </Link>
+        <div className="flex items-center gap-3">
+          <ShieldCheck className="text-cyan-500 w-5 h-5" />
+          <h1 className="text-sm font-black text-white uppercase italic tracking-tighter">Partner <span className="text-cyan-500">Provisioning</span></h1>
+        </div>
+      </header>
+
+      <main className="flex-grow flex items-center justify-center">
+        <div className="max-w-md w-full bg-[#080808] border border-gray-900 rounded-[2.5rem] p-10 relative shadow-2xl overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-cyan-600 shadow-[0_0_20px_rgba(6,182,212,0.4)]"></div>
+          
+          <div className="mb-8 text-center">
+             <Building2 className="w-10 h-10 text-gray-800 mx-auto mb-4" />
+             <p className="text-[9px] text-gray-500 uppercase font-black tracking-[0.3em]">Identity Enrollment</p>
           </div>
-          <div className="flex gap-4">
-            <Link href="/admin">
-              <button className="p-3 bg-gray-950 border border-gray-900 rounded-xl hover:text-cyan-500 transition-all">
-                <ShieldCheck className="w-4 h-4" />
-              </button>
-            </Link>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label className="text-[9px] text-gray-600 uppercase tracking-[0.3em] block mb-3 font-black">Partner Legal Name</label>
+              <div className="relative">
+                <input 
+                  required 
+                  type="text" 
+                  value={formData.companyName}
+                  onChange={(e) => setFormData({...formData, companyName: e.target.value})}
+                  className="w-full bg-[#050505] border border-gray-800 rounded-2xl py-4 px-6 text-white font-bold outline-none focus:border-cyan-600 transition-all" 
+                  placeholder="e.g. Dangote Logistics" 
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[9px] text-gray-600 uppercase tracking-[0.3em] block mb-3 font-black">Authorized Email</label>
+              <div className="relative">
+                <Mail className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-800" />
+                <input 
+                  required 
+                  type="email" 
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  className="w-full bg-[#050505] border border-gray-800 rounded-2xl py-4 px-6 text-white font-bold outline-none focus:border-cyan-600 transition-all" 
+                  placeholder="partner@enterprise.com" 
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[9px] text-gray-600 uppercase tracking-[0.3em] block mb-3 font-black">Security Credentials</label>
+              <div className="relative">
+                <Lock className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-800" />
+                <input 
+                  required 
+                  type="password" 
+                  value={formData.password}
+                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  className="w-full bg-[#050505] border border-gray-800 rounded-2xl py-4 px-6 text-white font-bold outline-none focus:border-cyan-600 transition-all" 
+                  placeholder="••••••••" 
+                />
+              </div>
+            </div>
+
+            <div className={`text-[8px] font-black tracking-widest uppercase text-center py-2 ${message.includes('ERROR') ? 'text-red-500' : 'text-cyan-500'}`}>
+              {message}
+            </div>
+
             <button 
-              onClick={() => supabase.auth.signOut().then(() => router.replace("/login"))} 
-              className="p-3 bg-gray-950 border border-gray-900 rounded-xl hover:text-red-500 transition-all"
+              disabled={loading} 
+              type="submit" 
+              className="w-full bg-cyan-950 hover:bg-cyan-600 text-white py-5 rounded-2xl uppercase tracking-[0.4em] text-[10px] font-black transition-all active:scale-95 shadow-xl flex items-center justify-center gap-4"
             >
-              <LogOut className="w-4 h-4" />
+              {loading ? <RefreshCcw className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
+              Generate Node
             </button>
-          </div>
-        </header>
+          </form>
+        </div>
+      </main>
 
-        <main className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12">
-          <div className="bg-[#080808] border border-gray-900 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden h-fit">
-            <div className="absolute top-0 left-0 w-full h-1 bg-cyan-600"></div>
-            <h3 className="text-[10px] text-gray-500 uppercase tracking-[0.3em] font-black mb-8">Provision Partner</h3>
-            <form onSubmit={handleOnboardPartner} className="space-y-6">
-              <div>
-                <label className="text-[9px] text-gray-600 uppercase font-black mb-2 block">Partner Email</label>
-                <input required type="email" value={partnerEmail} onChange={e => setPartnerEmail(e.target.value)} className="w-full bg-black border border-gray-800 rounded-2xl py-5 px-6 text-sm text-white focus:border-cyan-600 outline-none transition-all" placeholder="partner@email.com" />
-              </div>
-              <div>
-                <label className="text-[9px] text-gray-600 uppercase font-black mb-2 block">Company Name</label>
-                <input required type="text" value={companyName} onChange={e => setCompanyName(e.target.value)} className="w-full bg-black border border-gray-800 rounded-2xl py-5 px-6 text-sm text-white focus:border-cyan-600 outline-none transition-all" placeholder="e.g. Dangote Logistics" />
-              </div>
-              <button disabled={loading} className="w-full bg-cyan-950 text-cyan-400 py-5 rounded-2xl font-black uppercase text-[10px] tracking-[0.3em] hover:bg-cyan-600 hover:text-white transition-all shadow-lg active:scale-95 flex justify-center items-center gap-3">
-                {loading ? <RefreshCcw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                AUTHORIZE PARTNER
-              </button>
-            </form>
-          </div>
-
-          <div className="bg-[#080808] border border-gray-900 rounded-[2.5rem] p-10 shadow-2xl h-fit">
-            <h3 className="text-[10px] text-gray-500 uppercase tracking-[0.3em] font-black mb-8 flex items-center gap-2">
-              <Activity className="w-3 h-3 text-emerald-500" /> Network Partners
-            </h3>
-            <ul className="space-y-4">
-              {partners.map((partner, index) => (
-                <li key={index} className="flex items-center justify-between p-6 bg-gray-950/40 rounded-2xl border border-gray-900">
-                  <div>
-                    <p className="text-sm font-black text-white tracking-tighter uppercase">{partner.company_name || "New Partner"}</p>
-                    <p className="text-[10px] text-gray-600 font-mono mt-1">{partner.owner_email}</p>
-                  </div>
-                  <button 
-                    onClick={() => handleTogglePartnerStatus(partner.owner_email, !!partner.active)} 
-                    className={`text-[9px] font-black uppercase px-4 py-2 rounded-xl border transition-all ${partner.active ? "text-emerald-500 border-emerald-900/50 hover:bg-emerald-500/10" : "text-red-500 border-red-900/50 hover:bg-red-500/10"}`}
-                    disabled={loading}
-                  >
-                    {partner.active ? "Active" : "Disabled"}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </main>
-
-        {message && (
-          <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-gray-900 text-cyan-400 text-[10px] font-black uppercase tracking-widest px-8 py-4 rounded-2xl border border-cyan-900/50 z-50">
-            {message}
-          </div>
-        )}
-      </div>
-
+      {/* Inline Replacement for broken Footer import */}
+      <footer className="max-w-4xl mx-auto w-full mt-10 border-t border-gray-900/60 pt-8 text-center">
+        <p className="text-[8px] text-gray-700 uppercase font-bold tracking-[0.5em]">
+          &copy; 2026 Seirei Forensic Trace • Yoki Technology Ltd
+        </p>
+      </footer>
     </div>
   );
 }
