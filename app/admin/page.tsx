@@ -35,7 +35,7 @@ export default function AdminControl() {
     fleet_manager_email: ""
   });
 
-  // 1. FIX: Added a fetchPartners definition inside or outside to be stable
+  // Fetch partners stable definition
   const fetchPartners = useCallback(async () => {
     const { data, error } = await supabase
       .from("fleet_trucks")
@@ -48,7 +48,7 @@ export default function AdminControl() {
     if (error) console.error("Error fetching partners:", error.message);
   }, []);
 
-  // 2. FIX: Improved Session Check with replace and stable dependencies
+  // Improved Session Check
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -64,7 +64,7 @@ export default function AdminControl() {
     checkSession();
   }, [router, fetchPartners]);
 
-  // 3. FIX: Stable Auto-fill search logic
+  // Stable Auto-fill search logic
   const checkExistingBatch = useCallback(async (id: string) => {
     const cleanId = id.toUpperCase().trim();
     if (cleanId.length < 3) return;
@@ -170,12 +170,12 @@ export default function AdminControl() {
         <div className="flex items-center gap-4">
           <Link href="/admin/trucks">
             <button className="p-3 bg-gray-950 border border-gray-900 rounded-xl hover:text-cyan-500 transition-all shadow-inner">
-              <Truck className="w-4 h-4" title="Fleet Inventory" />
+              <Truck className="w-4 h-4" />
             </button>
           </Link>
           <Link href="/admin/partners/onboard">
             <button className="p-3 bg-gray-950 border border-gray-900 rounded-xl hover:text-cyan-500 transition-all shadow-inner">
-              <UserPlus className="w-4 h-4" title="Onboard Partner" />
+              <UserPlus className="w-4 h-4" />
             </button>
           </Link>
           <button 
