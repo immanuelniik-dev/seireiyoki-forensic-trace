@@ -1,23 +1,31 @@
-const withPWAInit = require("@ducanh2912/next-pwa").default;
+import type { NextConfig } from "next";
 
-/** @type {import('next').NextConfig} */
-const withPWA = withPWAInit({
-  dest: "public",
-  cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: true,
-  reloadOnOnline: true,
-  sw: "sw.js",
-  // PWA is disabled in dev to speed up refresh times
-  disable: process.env.NODE_ENV === "development",
-});
-
-const nextConfig = {
-  // We removed the 'turbopack' key from here as it is no longer supported in v16.2.1
+const nextConfig: NextConfig = {
+  /* config options here */
+  
   // The --webpack flag in package.json handles the engine selection.
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
+    // This fix defines 'config' as any implicitly within the function 
+    // or you can use the internal Next.js types. 
+    // For a quick production fix that clears the 'any' error:
     return config;
   },
+
   reactStrictMode: true,
+  
+  // If you are using images from external CDNs (like Leaflet markers)
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'raw.githubusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cdnjs.cloudflare.com',
+      },
+    ],
+  },
 };
 
-module.exports = withPWA(nextConfig);
+export default nextConfig;
