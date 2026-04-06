@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, use } from "react"; // Added 'use'
 import { createClient } from "@supabase/supabase-js";
 import { ArrowLeft, MapPin, Activity, UserCircle, Phone, CreditCard, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -20,9 +20,16 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 );
 
-export default function BuyerTrackPage({ params }: { params: { id: string } }) {
-  // Use React.use() or a standard variable for params in client components
-  const unwrappedId = params.id; 
+// Define the interface for the new Next.js params standard
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
+
+export default function BuyerTrackPage({ params }: PageProps) {
+  // 1. Unwrap the params using React's 'use' hook to fix Vercel Build Error
+  const resolvedParams = use(params);
+  const unwrappedId = resolvedParams.id; 
+
   const [batch, setBatch] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [address, setAddress] = useState<string>("Initializing Satellite Link...");
@@ -30,7 +37,9 @@ export default function BuyerTrackPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     async function fetchBatchData() {
-      // 1. Fetch Batch with Joined Truck Data
+      if (!unwrappedId) return;
+
+      // Fetch Batch with Joined Truck Data
       const { data: batchData, error } = await supabase
         .from("batches")
         .select(`
@@ -41,7 +50,6 @@ export default function BuyerTrackPage({ params }: { params: { id: string } }) {
             plate_number
           )
         `)
-        // Check both ID and Batch Number for flexibility
         .or(`id.eq.${unwrappedId},batch_number.ilike.%${unwrappedId}%`)
         .maybeSingle();
 
@@ -62,7 +70,7 @@ export default function BuyerTrackPage({ params }: { params: { id: string } }) {
 
     fetchBatchData();
 
-    // 2. Realtime Updates for Status and Coordinates
+    // Realtime Updates for Status and Coordinates
     const channel = supabase
       .channel(`public:batches:id=eq.${unwrappedId}`)
       .on(
@@ -84,7 +92,7 @@ export default function BuyerTrackPage({ params }: { params: { id: string } }) {
     };
   }, [unwrappedId]);
 
-  // 3. Reverse Geocoding (Convert Lat/Lng to Street Name)
+  // Reverse Geocoding (Convert Lat/Lng to Street Name)
   useEffect(() => {
     const lat = batch?.latitude || batch?.last_lat;
     const lng = batch?.longitude || batch?.last_lng;
@@ -129,7 +137,6 @@ export default function BuyerTrackPage({ params }: { params: { id: string } }) {
         <div className="lg:col-span-7 space-y-6">
           <div className="bg-[#080808] border border-gray-900 rounded-[2.5rem] overflow-hidden relative shadow-2xl">
             <div className="h-[500px] w-full">
-              {/* Ensure we pass the Internal UUID to the map for the Blue Line trace */}
               <DynamicBuyerTraceMap batchId={batch.id} />
             </div>
             <div className="p-6 bg-[#0a0a0a] border-t border-gray-900 flex items-center gap-4">
@@ -158,7 +165,7 @@ export default function BuyerTrackPage({ params }: { params: { id: string } }) {
         <div className="lg:col-span-5 space-y-8">
           <div className="bg-[#080808] border border-gray-900 rounded-[2.5rem] p-10 space-y-8 shadow-xl relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-10">
-               <ShieldCheck className="w-20 h-20 text-cyan-500" />
+               <ShieldCheckIcon className="w-20 h-20 text-cyan-500" />
             </div>
             <h3 className="text-[10px] text-gray-500 uppercase font-black border-b border-gray-900 pb-4 tracking-[0.3em]">Chain of Custody</h3>
             {driverInfo ? (
@@ -213,8 +220,8 @@ export default function BuyerTrackPage({ params }: { params: { id: string } }) {
   );
 }
 
-// Sub-component for simple icons
-function ShieldCheck({ className }: { className?: string }) {
+// Renamed to ShieldCheckIcon to avoid any potential conflicts
+function ShieldCheckIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>
   );
