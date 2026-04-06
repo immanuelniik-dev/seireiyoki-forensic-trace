@@ -85,9 +85,10 @@ export default function FleetDashboard() {
         if (allBatches) setBatches(allBatches);
 
       } else {
+        // MANAGER LOGIC: Fetching trucks with all forensic columns
         const { data: fleet } = await supabase
           .from("fleet_trucks")
-          .select("*, payment_due_date")
+          .select("*, payment_due_date, truck_model, assigned_driver_name")
           .ilike("owner_email", email);
 
         const { data: b } = await supabase
@@ -297,7 +298,7 @@ export default function FleetDashboard() {
                           <div className="p-3 bg-cyan-950/10 border border-cyan-900/30 rounded-xl text-cyan-500"><Truck className="w-5 h-5" /></div>
                           <div>
                             <h4 className="text-white font-black uppercase italic">{truck.truck_name || "Heavy Asset"}</h4>
-                            <p className="text-[10px] text-gray-600 font-bold">{truck.plate_number}</p>
+                            <p className="text-[10px] text-gray-600 font-bold">{truck.plate_number} {truck.truck_model ? `• ${truck.truck_model}` : ""}</p>
                           </div>
                         </div>
                         <History className={`w-4 h-4 ${viewingHistory === truck.plate_number ? "text-cyan-500" : "text-gray-800"}`} />
@@ -305,6 +306,10 @@ export default function FleetDashboard() {
 
                       {viewingHistory === truck.plate_number && (
                         <div className="bg-black/40 border-t border-gray-900 p-6 space-y-4">
+                          <div className="mb-4 pb-4 border-b border-gray-900">
+                             <p className="text-[8px] text-gray-700 uppercase font-bold mb-1">Assigned Personnel</p>
+                             <p className="text-[10px] text-gray-300 font-black uppercase italic">{truck.assigned_driver_name || "No Driver Assigned"}</p>
+                          </div>
                           {selectedTruckLogs.length === 0 ? (
                             <p className="text-[9px] text-gray-700 italic uppercase">No Forensic History Recorded</p>
                           ) : (
