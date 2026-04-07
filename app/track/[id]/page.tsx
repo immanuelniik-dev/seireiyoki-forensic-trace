@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, use } from "react"; // Added 'use'
+import React, { useEffect, useState, use } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { ArrowLeft, MapPin, Activity, UserCircle, Phone, CreditCard, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -39,18 +39,19 @@ export default function BuyerTrackPage({ params }: PageProps) {
     async function fetchBatchData() {
       if (!unwrappedId) return;
 
-      // Fetch Batch with Joined Truck Data
+      // FIX: Use a Left Join (removed !inner) so records show even without a truck assigned.
+      // Added .toUpperCase() to ensure matching against the DB's batch_number format.
       const { data: batchData, error } = await supabase
         .from("batches")
         .select(`
           *,
-          fleet_trucks!inner (
+          fleet_trucks (
             driver_name, 
             driver_phone, 
             plate_number
           )
         `)
-        .or(`id.eq.${unwrappedId},batch_number.ilike.%${unwrappedId}%`)
+        .or(`id.eq.${unwrappedId},batch_number.eq.${unwrappedId.toUpperCase()}`)
         .maybeSingle();
 
       if (error) {
@@ -220,7 +221,6 @@ export default function BuyerTrackPage({ params }: PageProps) {
   );
 }
 
-// Renamed to ShieldCheckIcon to avoid any potential conflicts
 function ShieldCheckIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>
