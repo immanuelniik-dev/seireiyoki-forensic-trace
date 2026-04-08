@@ -1,146 +1,240 @@
 "use client";
 
-import { useEffect, useState, use } from "react"; // Added 'use'
+import React, { useEffect, useState, use as reactUse } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { RefreshCcw, ShieldCheck, Package, MapPin, CheckCircle2 } from "lucide-react";
+import { 
+  RefreshCcw, ShieldCheck, Package, MapPin, 
+  CheckCircle2, ArrowLeft, Activity, UserCircle, 
+  Phone, Building2, Calendar
+} from "lucide-react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
+import "leaflet/dist/leaflet.css";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+const DynamicBuyerTraceMap = dynamic(
+  () => import("@/components/Map/BuyerTraceMap"),
+  { 
+    ssr: false, 
+    loading: () => <div className="h-full w-full bg-[#0a0a0a] animate-pulse flex items-center justify-center text-[10px] font-black text-gray-800 uppercase tracking-[0.3em]">Syncing Satellite Link...</div> 
+  }
 );
 
-// 1. Define the Batch Interface so TypeScript knows the columns exist
-interface BatchRecord {
-  id: string;
-  batch_number: string;
-  product_name: string;
-  status: string;
-  milestone1_verified?: boolean;
-  milestone2_verified?: boolean;
-  milestone3_verified?: boolean;
-  [key: string]: any; 
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
-interface PageProps {
-  params: Promise<{ id: string }>;
-}
+export default function BatchDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = reactUse(params);
+  const unwrappedId = decodeURIComponent(resolvedParams.id).trim().toUpperCase();
 
-export default function BatchDetailsPage({ params }: PageProps) {
-  // 2. Unwrap params for Next.js 16 compatibility
-  const resolvedParams = use(params);
-  const id = resolvedParams.id;
-
-  const [batch, setBatch] = useState<BatchRecord | null>(null);
+  const [batch, setBatch] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [milestoneStatus, setMilestoneStatus] = useState({
-    milestone1: false,
-    milestone2: false,
-    milestone3: false,
-  });
+  const [address, setAddress] = useState<string>("Locating Asset...");
+  const [driverInfo, setDriverInfo] = useState<any>(null);
+
+  // FIXED: The Forensic Match Logic for Chain of Custody
+  const fetchDriverDetails = async (plate: string) => {
+    if (!plate) return;
+    
+    // Clean the plate string to ensure a perfect database match
+    const cleanPlate = plate.trim().toUpperCase();
+
+    const { data: truckData, error } = await supabase
+      .from("fleet_trucks")
+      .select("assigned_driver_name, assigned_driver_phone, plate_number, driver_name, driver_phone")
+      .eq("plate_number", cleanPlate)
+      .maybeSingle();
+    
+    if (error) {
+      console.error("❌ CUSTODY ERROR:", error.message);
+    } else if (truckData) {
+      // Prioritize 'assigned_driver' fields, fallback to standard 'driver' fields
+      setDriverInfo({
+        name: truckData.assigned_driver_name || truckData.driver_name,
+        phone: truckData.assigned_driver_phone || truckData.driver_phone,
+        plate: truckData.plate_number
+      });
+    }
+  };
 
   useEffect(() => {
-    async function getBatch() {
-      const { data, error } = await supabase
-        .from("batches")
-        .select("*")
-        .eq("id", id)
-        .single();
+    if (!unwrappedId) return;
 
+    const initForensics = async () => {
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(unwrappedId);
+      let query = supabase.from("batches").select("*");
+      isUUID ? query = query.eq("id", unwrappedId) : query = query.eq("batch_number", unwrappedId);
+
+      const { data } = await query.maybeSingle();
+      
       if (data) {
-        const b = data as BatchRecord;
-        setBatch(b);
-        setMilestoneStatus({
-          milestone1: b.milestone1_verified ?? false,
-          milestone2: b.milestone2_verified ?? false,
-          milestone3: b.milestone3_verified ?? false,
-        });
+        setBatch(data);
+        // Execute the match using the plate from the batch record
+        fetchDriverDetails(data.truck_plate || data.plate_number);
       }
       setLoading(false);
-    }
-    getBatch();
+    };
 
-    // 3. Type-safe Realtime Listener
+    initForensics();
+
+    // Realtime Pulse: Keep milestones and driver links in sync
+    const channelName = `forensic-sync-${unwrappedId.replace(/[^a-zA-Z0-9]/g, '')}`;
     const channel = supabase
-      .channel(`batch-updates-${id}`)
+      .channel(channelName)
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "batches", filter: `id=eq.${id}` },
+        { event: "UPDATE", schema: "public", table: "batches" },
         (payload) => {
-          // Cast the new payload to our interface
-          const updatedRecord = payload.new as BatchRecord;
-          setBatch(updatedRecord);
-          setMilestoneStatus({
-            milestone1: updatedRecord.milestone1_verified ?? false,
-            milestone2: updatedRecord.milestone2_verified ?? false,
-            milestone3: updatedRecord.milestone3_verified ?? false,
-          });
+          if (payload.new.batch_number === unwrappedId) {
+            setBatch(payload.new);
+            // If the truck was changed, re-fetch driver details instantly
+            fetchDriverDetails(payload.new.truck_plate || payload.new.plate_number);
+          }
         }
       )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [id]);
+  }, [unwrappedId]);
 
-  if (loading) return <div className="min-h-screen bg-black flex items-center justify-center"><RefreshCcw className="animate-spin text-cyan-500" /></div>;
+  // Reverse Geocoding for the Map Label
+  useEffect(() => {
+    const lat = batch?.latitude || batch?.last_lat;
+    const lng = batch?.longitude || batch?.last_lng;
+    if (lat && lng) {
+      fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18`)
+        .then(res => res.json())
+        .then(data => setAddress(data.display_name || "Active Transit Zone"));
+    }
+  }, [batch?.latitude, batch?.longitude]);
 
-  if (!batch) return <div className="min-h-screen bg-black text-white flex items-center justify-center uppercase font-black tracking-widest text-[10px]">Record Not Found</div>;
+  if (loading) return (
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <RefreshCcw className="animate-spin text-cyan-500 w-10 h-10" />
+    </div>
+  );
+
+  if (!batch) return (
+    <div className="min-h-screen bg-black text-red-900 flex items-center justify-center uppercase font-black tracking-widest text-[10px]">
+      Node_Not_Found
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-[#050505] text-gray-300 font-mono p-6 md:p-12">
-      <header className="max-w-4xl mx-auto mb-12 flex justify-between items-center border-b border-gray-900 pb-8">
+    <div className="min-h-screen bg-[#050505] text-gray-300 font-mono p-6 md:p-12 relative overflow-hidden">
+      <div className="absolute inset-0 opacity-[0.03] bg-[url('/scan-lines.png')] pointer-events-none"></div>
+
+      <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-end mb-12 border-b border-gray-900 pb-10 relative z-10 gap-6">
         <div>
-          <h1 className="text-xl font-black text-white uppercase italic tracking-tighter">Batch <span className="text-cyan-500">Forensics</span></h1>
-          <p className="text-[9px] text-gray-600 uppercase tracking-widest mt-1">UUID: {batch.id}</p>
+          <h1 className="text-3xl font-black text-white uppercase italic tracking-tighter flex items-center gap-3">
+             <Activity className="w-6 h-6 text-cyan-500 animate-pulse" /> Batch <span className="text-cyan-500">Forensics</span>
+          </h1>
+          <div className="flex items-center gap-4 mt-3">
+            <p className="text-[10px] text-gray-600 uppercase font-black tracking-widest border border-gray-900 px-3 py-1 rounded-md">Terminal-ID: {batch.batch_number}</p>
+            <div className="flex items-center gap-2 text-cyan-400/80 bg-cyan-400/5 px-3 py-1 rounded-md border border-cyan-900/30">
+               <Building2 className="w-3 h-3" />
+               <p className="text-[9px] font-black uppercase tracking-widest">{batch.partner_name || "Yoki Technology Limited"}</p>
+            </div>
+          </div>
         </div>
-        <Link href="/admin">
-          <button className="px-6 py-2 border border-gray-900 rounded-xl text-[9px] font-black uppercase hover:bg-white hover:text-black transition-all">
-            Terminal
+        
+        <Link href="/">
+          <button className="px-6 py-3 border border-gray-800 rounded-2xl text-[9px] font-black uppercase hover:bg-white hover:text-black transition-all flex items-center gap-2 bg-black">
+            <ArrowLeft className="w-3 h-3" /> Back to Terminal
           </button>
         </Link>
       </header>
 
-      <main className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="bg-[#080808] border border-gray-900 rounded-[2rem] p-8 space-y-6">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-cyan-950/20 border border-cyan-900/30 rounded-xl text-cyan-500">
-              <Package className="w-5 h-5" />
+      <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10 relative z-10">
+        <div className="lg:col-span-8 space-y-8">
+          <div className="bg-[#080808] border border-gray-900 rounded-[3.5rem] overflow-hidden shadow-2xl relative h-[550px]">
+            <div className="absolute inset-0 z-0">
+               <DynamicBuyerTraceMap batchId={batch.id} />
             </div>
-            <div>
-              <p className="text-[10px] text-gray-600 uppercase font-black">Consignment</p>
-              <h2 className="text-white font-black uppercase italic">{batch.product_name}</h2>
+            <div className="absolute bottom-8 left-8 right-8 p-5 bg-black/90 backdrop-blur-xl border border-gray-900 rounded-[2rem] flex items-center gap-4 z-50">
+               <div className="p-2 bg-cyan-500/10 rounded-lg"><MapPin className="w-4 h-4 text-cyan-500 animate-bounce" /></div>
+               <div>
+                  <p className="text-[7px] text-gray-600 uppercase font-black mb-0.5">Verified Geocode</p>
+                  <p className="text-[9px] uppercase font-bold text-gray-400 tracking-tight italic truncate">{address}</p>
+               </div>
             </div>
           </div>
 
-          <div className="space-y-4 pt-4 border-t border-gray-900">
-             <div className="flex justify-between items-center">
-                <span className="text-[9px] text-gray-600 uppercase font-bold">Ledger ID</span>
-                <span className="text-[10px] text-white font-mono">{batch.batch_number}</span>
+          <div className="bg-[#080808] border border-gray-900 rounded-[2.5rem] p-10 flex justify-between items-center shadow-xl">
+             <div className="flex items-center gap-6">
+                <div className="p-4 bg-black border border-gray-800 rounded-2xl text-cyan-500 shadow-inner"><Package className="w-6 h-6" /></div>
+                <div>
+                   <p className="text-[9px] text-gray-600 uppercase font-black tracking-widest mb-1">Asset Status</p>
+                   <h2 className="text-xl font-black text-white uppercase italic tracking-tighter">{batch.product_name}</h2>
+                </div>
              </div>
-             <div className="flex justify-between items-center">
-                <span className="text-[9px] text-gray-600 uppercase font-bold">Current Status</span>
-                <span className="text-[10px] text-cyan-500 font-black uppercase">{batch.status}</span>
+             <div className="flex items-center gap-3 px-6 py-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl shadow-[0_0_20px_rgba(16,185,129,0.05)]">
+               <ShieldCheck className="w-4 h-4 text-emerald-500" />
+               <p className="text-[10px] text-emerald-500 font-black uppercase tracking-[0.2em]">{batch.status}</p>
              </div>
           </div>
         </div>
 
-        <div className="bg-[#080808] border border-gray-900 rounded-[2rem] p-8 space-y-6">
-          <h3 className="text-[10px] text-gray-600 uppercase font-black tracking-widest mb-4">Milestone Verification</h3>
-          <div className="space-y-4">
-            {[
-              { id: 1, label: "Quality Audit", status: milestoneStatus.milestone1 },
-              { id: 2, label: "Logistics Sealed", status: milestoneStatus.milestone2 },
-              { id: 3, label: "Terminal Handover", status: milestoneStatus.milestone3 }
-            ].map((m) => (
-              <div key={m.id} className="flex items-center justify-between p-4 bg-black rounded-2xl border border-gray-900">
-                <span className="text-[10px] font-black uppercase text-gray-400">{m.label}</span>
-                {m.status ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                ) : (
-                  <div className="w-4 h-4 rounded-full border-2 border-gray-800" />
-                )}
+        <div className="lg:col-span-4 space-y-8">
+          <div className="bg-[#080808] border border-gray-900 rounded-[2.5rem] p-10 shadow-xl border-t-cyan-900/20 relative overflow-hidden">
+              <h3 className="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-8 border-b border-gray-900 pb-4 italic">Verification Chain</h3>
+              <div className="space-y-8">
+                {[
+                  { label: "Quality Audit", time: batch.created_at },
+                  { label: "Logistics Sealed", time: batch.created_at },
+                  { label: "Terminal Handover", time: batch.created_at }
+                ].map((m, i) => (
+                  <div key={i} className="group relative">
+                    <div className="flex items-center justify-between p-5 bg-black/40 rounded-2xl border border-emerald-900/30">
+                      <span className="text-[10px] font-black uppercase text-emerald-500/70 italic">{m.label}</span>
+                      <div className="flex items-center gap-2 text-emerald-500 text-[8px] font-black uppercase bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
+                         Verified <CheckCircle2 className="w-3 h-3" />
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center gap-2 px-2 text-[8px] font-black text-gray-600 uppercase italic">
+                      <Calendar className="w-2.5 h-2.5" /> 
+                      {new Date(m.time || Date.now()).toLocaleDateString('en-GB')}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+          </div>
+
+          {/* CHAIN OF CUSTODY */}
+          <div className="bg-[#080808] border border-gray-900 rounded-[2.5rem] p-10 shadow-xl">
+             <h3 className="text-[10px] text-gray-500 uppercase font-black border-b border-gray-900 pb-4 tracking-widest mb-6 italic">Chain of Custody</h3>
+             
+             {driverInfo ? (
+              <div className="space-y-6">
+                <div className="flex items-center gap-5 p-5 bg-black/40 rounded-2xl border border-gray-900/50 hover:border-cyan-900/30 transition-all">
+                   <div className="p-2 bg-cyan-500/10 rounded-lg text-cyan-500"><UserCircle className="w-6 h-6" /></div>
+                   <div>
+                      <p className="text-xs font-black text-white uppercase italic tracking-tighter">{driverInfo.name}</p>
+                      <p className="text-[7px] text-gray-600 uppercase font-black mt-1">Authorized Driver</p>
+                   </div>
+                </div>
+                <div className="flex items-center gap-5 p-5 bg-black/40 rounded-2xl border border-gray-900/50 hover:border-cyan-900/30 transition-all">
+                   <div className="p-2 bg-cyan-500/10 rounded-lg text-cyan-500"><Phone className="w-6 h-6" /></div>
+                   <div>
+                      <p className="text-xs font-black text-white uppercase italic tracking-tighter">{driverInfo.phone}</p>
+                      <p className="text-[7px] text-gray-600 uppercase font-black mt-1">Satellite Line</p>
+                   </div>
+                </div>
+                <div className="flex items-center gap-5 p-5 bg-black/40 rounded-2xl border border-gray-900/50">
+                   <div className="p-2 bg-cyan-500/10 rounded-lg text-cyan-500"><Activity className="w-6 h-6" /></div>
+                   <div>
+                      <p className="text-xs font-black text-white uppercase italic tracking-tighter">{driverInfo.plate}</p>
+                      <p className="text-[7px] text-gray-600 uppercase font-black mt-1">Vessel Registry</p>
+                   </div>
+                </div>
+              </div>
+             ) : (
+               <div className="text-center py-6">
+                  <RefreshCcw className="w-5 h-5 animate-spin mx-auto mb-2 text-gray-800" />
+                  <p className="text-[8px] text-gray-800 italic uppercase tracking-widest">Awaiting Custody Data</p>
+               </div>
+             )}
           </div>
         </div>
       </main>
