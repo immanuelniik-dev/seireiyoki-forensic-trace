@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, use as reactUse } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { shareTrace } from "@/lib/shareTrace";
 import { 
   RefreshCcw, ShieldCheck, Package, MapPin, 
   CheckCircle2, ArrowLeft, Activity, UserCircle, 
@@ -43,13 +44,13 @@ export default function BatchDetailsPage({ params }: { params: Promise<{ id: str
     const { data: truckData, error } = await supabase
       .from("fleet_trucks")
       .select("assigned_driver_name, assigned_driver_phone, plate_number, driver_name, driver_phone")
-      .eq("plate_number", cleanPlate)
+      .ilike("plate_number", cleanPlate)
       .maybeSingle();
     
     if (error) {
       console.error("❌ CUSTODY ERROR:", error.message);
     } else if (truckData) {
-      // Prioritize 'assigned_driver' fields, fallback to standard 'driver' fields
+      // Prioritize \'assigned_driver\' fields, fallback to standard \'driver\' fields
       setDriverInfo({
         name: truckData.assigned_driver_name || truckData.driver_name,
         phone: truckData.assigned_driver_phone || truckData.driver_phone,
@@ -66,12 +67,14 @@ export default function BatchDetailsPage({ params }: { params: Promise<{ id: str
       let query = supabase.from("batches").select("*");
       isUUID ? query = query.eq("id", unwrappedId) : query = query.eq("batch_number", unwrappedId);
 
-      const { data } = await query.maybeSingle();
+      const { data: batchData, error: batchError } = await query.maybeSingle();
       
-      if (data) {
-        setBatch(data);
+      if (batchError) {
+        console.error("❌ BATCH FETCH ERROR:", batchError.message);
+      } else if (batchData) {
+        setBatch(batchData);
         // Execute the match using the plate from the batch record
-        fetchDriverDetails(data.truck_plate || data.plate_number);
+        fetchDriverDetails(batchData.truck_plate || batchData.plate_number);
       }
       setLoading(false);
     };
@@ -79,7 +82,7 @@ export default function BatchDetailsPage({ params }: { params: Promise<{ id: str
     initForensics();
 
     // Realtime Pulse: Keep milestones and driver links in sync
-    const channelName = `forensic-sync-${unwrappedId.replace(/[^a-zA-Z0-9]/g, '')}`;
+    const channelName = `forensic-sync-${unwrappedId.replace(/[^a-zA-Z0-9]/g, "")}`;
     const channel = supabase
       .channel(channelName)
       .on(
@@ -139,11 +142,19 @@ export default function BatchDetailsPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
         
-        <Link href="/">
-          <button className="px-6 py-3 border border-gray-800 rounded-2xl text-[9px] font-black uppercase hover:bg-white hover:text-black transition-all flex items-center gap-2 bg-black">
-            <ArrowLeft className="w-3 h-3" /> Back to Terminal
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => shareTrace(unwrappedId, window.location.href)}
+            className="px-6 py-3 border border-gray-800 rounded-2xl text-[9px] font-black uppercase hover:bg-white hover:text-black transition-all flex items-center gap-2 bg-black"
+          >
+            Share Trace
           </button>
-        </Link>
+          <Link href="/">
+            <button className="px-6 py-3 border border-gray-800 rounded-2xl text-[9px] font-black uppercase hover:bg-white hover:text-black transition-all flex items-center gap-2 bg-black">
+              <ArrowLeft className="w-3 h-3" /> Back to Terminal
+            </button>
+          </Link>
+        </div>
       </header>
 
       <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10 relative z-10">
@@ -180,22 +191,34 @@ export default function BatchDetailsPage({ params }: { params: Promise<{ id: str
           <div className="bg-[#080808] border border-gray-900 rounded-[2.5rem] p-10 shadow-xl border-t-cyan-900/20 relative overflow-hidden">
               <h3 className="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-8 border-b border-gray-900 pb-4 italic">Verification Chain</h3>
               <div className="space-y-8">
-                {[
-                  { label: "Quality Audit", time: batch.created_at },
-                  { label: "Logistics Sealed", time: batch.created_at },
-                  { label: "Terminal Handover", time: batch.created_at }
-                ].map((m, i) => (
+                {[  
+                  { label: "Quality Audit", key: "qa_verified_at" },
+                  { label: "Logistics Sealed", key: "logistics_sealed_at" },
+                  { label: "Terminal Handover", key: "terminal_handover_at" }
+                ].map((m: any, i: number) => (
                   <div key={i} className="group relative">
-                    <div className="flex items-center justify-between p-5 bg-black/40 rounded-2xl border border-emerald-900/30">
-                      <span className="text-[10px] font-black uppercase text-emerald-500/70 italic">{m.label}</span>
-                      <div className="flex items-center gap-2 text-emerald-500 text-[8px] font-black uppercase bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
-                         Verified <CheckCircle2 className="w-3 h-3" />
+                    <div className={`flex items-center justify-between p-5 bg-black/40 rounded-2xl border \
+                      ${batch[m.key] ? "border-emerald-900/30" : "border-gray-900/30"}`}>
+                      <span className={`text-[10px] font-black uppercase \
+                        ${batch[m.key] ? "text-emerald-500/70" : "text-gray-500/70"} italic`}>
+                        {m.label}
+                      </span>
+                      {batch[m.key] ? (
+                        <div className="flex items-center gap-2 text-emerald-500 text-[8px] font-black uppercase bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
+                           Verified <CheckCircle2 className="w-3 h-3" />
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-gray-700 text-[8px] font-black uppercase bg-gray-900/10 px-3 py-1 rounded-full border border-gray-800/40">
+                           Pending <RefreshCcw className="w-3 h-3 animate-spin" />
+                        </div>
+                      )}
+                    </div>
+                    {batch[m.key] && (
+                      <div className="mt-3 flex items-center gap-2 px-2 text-[8px] font-black text-gray-600 uppercase italic">
+                        <Calendar className="w-2.5 h-2.5" /> 
+                        {new Date(batch[m.key]).toLocaleDateString("en-GB")}
                       </div>
-                    </div>
-                    <div className="mt-3 flex items-center gap-2 px-2 text-[8px] font-black text-gray-600 uppercase italic">
-                      <Calendar className="w-2.5 h-2.5" /> 
-                      {new Date(m.time || Date.now()).toLocaleDateString('en-GB')}
-                    </div>
+                    )}
                   </div>
                 ))}
               </div>

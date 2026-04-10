@@ -52,7 +52,7 @@ export default function FleetDashboard() {
           .select("owner_email, company_name, active");
 
         if (partners) {
-          const uniqueEmails = Array.from(new Set(partners.map(p => p.owner_email)));
+          const uniqueEmails = Array.from(new Set(partners.map(p => p.owner_email).filter(Boolean)));
           const partnersSummary = await Promise.all(uniqueEmails.map(async (pEmail) => {
             const pInfo = partners.find(p => p.owner_email === pEmail);
             const { count: truckCount } = await supabase
@@ -93,7 +93,7 @@ export default function FleetDashboard() {
 
         const { data: b } = await supabase
           .from("batches")
-          .select(`*, customers (email)`)
+          .select(`*, customers (email), qa_verified_at, logistics_sealed_at, terminal_handover_at`)
           .ilike("fleet_manager_email", email)
           .order("created_at", { ascending: false });
 
@@ -122,11 +122,24 @@ export default function FleetDashboard() {
     init();
   }, []);
 
-  const handleStatusUpdate = async (batch: any, newStatus: string) => {
+  const handleStatusUpdate = async (batch: any, milestoneKey: string) => {
     setLoading(true);
+    const updateObject: any = { last_updated: new Date().toISOString() };
+
+    if (milestoneKey === "logistics_sealed_at") {
+      updateObject.logistics_sealed_at = new Date().toISOString();
+      updateObject.status = "In Transit - Sealed";
+    } else if (milestoneKey === "terminal_handover_at") {
+      updateObject.terminal_handover_at = new Date().toISOString();
+      updateObject.status = "Audit Verified";
+    } else if (milestoneKey === "qa_verified_at") {
+      updateObject.qa_verified_at = new Date().toISOString();
+      // No status change here, as "Audit Verified" implies all milestones are done
+    }
+
     const { error } = await supabase
       .from("batches")
-      .update({ status: newStatus, last_updated: new Date().toISOString() })
+      .update(updateObject)
       .eq("id", batch.id);
 
     if (error) {
@@ -136,14 +149,14 @@ export default function FleetDashboard() {
     }
 
     const buyerEmail = batch.customers?.email;
-    if (buyerEmail && (newStatus === "02: Transit" || newStatus === "03: Handover")) {
+    if (buyerEmail && (milestoneKey === "logistics_sealed_at" || milestoneKey === "terminal_handover_at")) {
       try {
         await fetch("/api/send-update", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             buyerEmail,
-            status: newStatus,
+            status: updateObject.status,
             consignmentId: batch.batch_number,
             partnerName: companyName,
           }),
@@ -260,18 +273,33 @@ export default function FleetDashboard() {
                       </div>
                       
                       <div className="flex gap-2">
-                        <button 
-                          onClick={() => handleStatusUpdate(batch, "02: Transit")}
-                          className="flex-1 py-3 bg-cyan-950/20 border border-cyan-900/50 text-cyan-500 text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-cyan-500 hover:text-black transition-all"
-                        >
-                          Start Transit
-                        </button>
-                        <button 
-                          onClick={() => handleStatusUpdate(batch, "03: Handover")}
-                          className="flex-1 py-3 bg-emerald-950/20 border border-emerald-900/50 text-emerald-500 text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-emerald-500 hover:text-black transition-all"
-                        >
-                          Complete Delivery
-                        </button>
+                          {/* Action buttons for status updates */}
+                          {!batch.logistics_sealed_at && (
+                            <button 
+                              onClick={() => handleStatusUpdate(batch, "logistics_sealed_at")}
+                              className="flex-1 py-3 bg-cyan-950/20 border border-cyan-900/50 text-cyan-500 text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-cyan-500 hover:text-black transition-all"
+                            >
+                              Seal Logistics
+                            </button>
+                          )}
+                          {!batch.terminal_handover_at && batch.logistics_sealed_at && (
+                            <button 
+                              onClick={() => handleStatusUpdate(batch, "terminal_handover_at")}
+                              className="flex-1 py-3 bg-emerald-950/20 border border-emerald-900/50 text-emerald-500 text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-emerald-500 hover:text-black transition-all"
+                            >
+                              Handover Terminal
+                            </button>
+                          )}
+                          
+                          {/* Optionally, a "Finalize Audit" button if all milestones are complete */}
+                          {batch.logistics_sealed_at && batch.terminal_handover_at && !batch.qa_verified_at && (
+                            <button
+                              onClick={() => handleStatusUpdate(batch, "qa_verified_at")}
+                              className="flex-1 py-3 bg-indigo-950/20 border border-indigo-900/50 text-indigo-500 text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-indigo-500 hover:text-black transition-all"
+                            >
+                              Finalize Audit
+                            </button>
+                          )}
                       </div>
                     </div>
                   ))
@@ -280,11 +308,11 @@ export default function FleetDashboard() {
 
               <div className="lg:col-span-5 space-y-8">
                 <h3 className="text-[10px] text-gray-500 font-black uppercase tracking-[0.4em] mb-6 flex items-center gap-2">
-                  <Truck className="w-3 h-3 text-cyan-500" /> Fleet Registry
+                  <Truck className="w-3 h-3" /> Fleet Registry
                 </h3>
                 <nav className="flex gap-6 mb-8 border-b border-gray-900 pb-4">
                   <Link href="/fleet/authentication" className="text-[9px] text-cyan-500 hover:text-white uppercase font-black tracking-widest">Auth Control</Link>
-                  <Link href="/fleet/consignments" className="text-[9px] text-gray-600 hover:text-white uppercase font-black tracking-widest">New Dispatch</Link>
+                  <Link href="/admin" className="text-[9px] text-gray-600 hover:text-white uppercase font-black tracking-widest">New Dispatch</Link>
                 </nav>
 
                 <div className="space-y-4">

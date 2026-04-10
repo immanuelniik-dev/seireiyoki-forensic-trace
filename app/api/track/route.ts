@@ -43,11 +43,22 @@ export async function POST(req: Request) {
     if (updateError) throw updateError;
 
     // 3. Log to historical "Chain of Custody"
+    // Retrieve batch_id or batch_no from the batches table using imei if needed
+    const { data: batchData } = await supabase
+      .from("batches")
+      .select("id, batch_number")
+      .eq("truck_imei", imei)
+      .maybeSingle();
+
+    const logEntry: any = { imei, latitude: lat, longitude: lng, speed, created_at: new Date().toISOString() };
+    if (batchData) {
+      logEntry.batch_id = batchData.id;
+      logEntry.batch_no = batchData.batch_number;
+    }
+
     await supabase
-      .from('gps_logs')
-      .insert([
-        { imei, lat, lng, speed, timestamp: new Date().toISOString() }
-      ]);
+      .from("gps_logs")
+      .insert([logEntry]);
 
     return NextResponse.json({ status: "ACK", message: "Node Updated" }, { status: 200 });
 

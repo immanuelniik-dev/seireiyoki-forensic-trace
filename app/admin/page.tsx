@@ -127,20 +127,26 @@ export default function AdminControl() {
       let finalBatchId = formData.batch_number;
       
       if (!exists) {
-        const companyName = "seirei";
-        const randomNum = Math.floor(1000 + Math.random() * 9000);
-        finalBatchId = `${companyName}-${randomNum}`.toUpperCase();
+        const companyName = "SEIREI"; 
+        const randomNum = Math.floor(1000 + Math.random() * 9000); 
+        finalBatchId = `${companyName}-${randomNum}`.toUpperCase(); 
       }
 
-      const { error } = await supabase
+      const currentTimestamp = new Date().toISOString();
+      const isPreVerified = formData.status === "Quality Certified"; 
+
+      const { error: upsertError } = await supabase
         .from("batches")
         .upsert({ 
             ...formData, 
             batch_number: finalBatchId, 
-            last_updated: new Date().toISOString() 
+            last_updated: currentTimestamp, 
+            qa_verified_at: isPreVerified ? currentTimestamp : null,
+            logistics_sealed_at: isPreVerified ? currentTimestamp : null,
+            terminal_handover_at: isPreVerified ? currentTimestamp : null,
         }, { onConflict: "batch_number" });
 
-      if (error) throw error;
+      if (upsertError) throw upsertError;
       
       setFormData(prev => ({ ...prev, batch_number: finalBatchId }));
       setMessage(`SUCCESS: ${finalBatchId} secured in ledger.`);

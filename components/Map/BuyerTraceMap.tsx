@@ -6,7 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import * as L from 'leaflet';
 import { createClient } from '@supabase/supabase-js';
 
-// Forensic Markers using pure CSS to avoid image loading issues
+// Forensic Markers using pure CSS
 const WarehouseIcon = L.divIcon({
   className: 'custom-warehouse-icon',
   html: `<div style="background-color: #00bcd4; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px #00bcd4;"></div>`,
@@ -44,13 +44,14 @@ const FitBoundsToPolyline: React.FC<{ positions: L.LatLngExpression[] }> = ({ po
 
 const BuyerTraceMap: React.FC<{ batchId: string }> = ({ batchId }) => {
   const [coordinates, setCoordinates] = useState<Coordinate[]>([]);
-  const mapId = useId(); // Generates a unique ID to prevent "Map container reused" error
+  const mapId = useId(); 
 
   useEffect(() => {
     const fetchCoordinates = async () => {
       if (!batchId) return;
       try {
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(batchId);
+        
         const { data: bMatch } = await supabase
           .from('batches')
           .select('id, batch_number')
@@ -62,20 +63,13 @@ const BuyerTraceMap: React.FC<{ batchId: string }> = ({ batchId }) => {
         const { data: logs } = await supabase.from('gps_logs').select('*');
 
         if (logs) {
-          const filteredLogs = logs.filter(row => 
-            row.batch_id === bMatch.id || row.batch_no === bMatch.batch_number || row.id === bMatch.id
-          );
-
-          const sortedLogs = filteredLogs.sort((a, b) => {
-            const timeA = new Date(a.created_at || a.timestamp || a.inserted_at || 0).getTime();
-            const timeB = new Date(b.created_at || b.timestamp || b.inserted_at || 0).getTime();
-            return timeA - timeB;
-          });
-
-          setCoordinates(sortedLogs.map(row => ({
+          // FIX: Explicitly typing row as 'any' to allow .lat and .lng fallback checks
+          const mappedCoordinates = (logs as any[]).map(row => ({
             latitude: Number(row.latitude || row.lat),
             longitude: Number(row.longitude || row.lng)
-          })).filter(c => !isNaN(c.latitude) && !isNaN(c.longitude)));
+          })).filter(c => !isNaN(c.latitude) && !isNaN(c.longitude));
+
+          setCoordinates(mappedCoordinates);
         }
       } catch (err) {
         console.error('Map Sync Error:', err);
@@ -91,7 +85,7 @@ const BuyerTraceMap: React.FC<{ batchId: string }> = ({ batchId }) => {
   ]);
 
   return (
-    <div className="w-full h-full relative forensic-map-container" style={{ minHeight: '500px' }}>
+    <div className="w-full h-full relative" style={{ minHeight: '400px' }}>
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes pulse {
           0% { transform: scale(1); opacity: 1; }
@@ -100,7 +94,6 @@ const BuyerTraceMap: React.FC<{ batchId: string }> = ({ batchId }) => {
         }
       `}} />
       
-      {/* The key={mapId} forces React to destroy and recreate the map if a collision occurs */}
       <MapContainer
         key={mapId}
         center={[9.0820, 8.6753]} 
@@ -110,7 +103,7 @@ const BuyerTraceMap: React.FC<{ batchId: string }> = ({ batchId }) => {
       >
         <TileLayer 
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; CARTO'
+          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
         />
         
         {polylinePositions.length > 0 && (

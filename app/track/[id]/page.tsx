@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, use as reactUse } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { ArrowLeft, MapPin, Activity, UserCircle, Phone, CreditCard, Loader2, ShieldCheck, Box } from "lucide-react";
+import { ArrowLeft, MapPin, Activity, UserCircle, Phone, CreditCard, Loader2, ShieldCheck, Box, RefreshCcw } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 
@@ -39,16 +39,14 @@ export default function BuyerTrackPage({ params }: { params: Promise<{ id: strin
       try {
         console.log("🔍 Forensic Search Initialized for:", unwrappedId);
 
-        // 1. Check if the input is a valid UUID format to prevent 400 Bad Request Errors
+        // 1. Check if the input is a valid UUID format
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(unwrappedId);
 
-        let query = supabase.from("batches").select("*");
+        let query = supabase.from("batches").select(`*, qa_verified_at, logistics_sealed_at, terminal_handover_at`);
 
         if (isUUID) {
-          // If it is a UUID, search the internal system ID column
           query = query.eq("id", unwrappedId);
         } else {
-          // If it is TEXT (like OB-5522), only search the batch_number column
           query = query.eq("batch_number", unwrappedId.toUpperCase());
         }
 
@@ -60,17 +58,21 @@ export default function BuyerTrackPage({ params }: { params: Promise<{ id: strin
           console.log("✅ Match Found in Ledger:", data.batch_number);
           setBatch(data);
 
-          // 2. Secondary Lookup for Driver/Truck info based on the truck plate
+          // 2. Secondary Lookup for Driver/Truck info
           const plate = data.truck_plate || data.plate_number;
           if (plate) {
             const { data: truckData } = await supabase
               .from("fleet_trucks")
-              .select("*")
+              .select("assigned_driver_name, assigned_driver_phone, plate_number, driver_name, driver_phone")
               .eq("plate_number", plate)
               .maybeSingle();
 
             if (truckData) {
-              setDriverInfo(truckData);
+              setDriverInfo({
+                name: truckData.assigned_driver_name || truckData.driver_name,
+                phone: truckData.assigned_driver_phone || truckData.driver_phone,
+                plate: truckData.plate_number
+              });
             }
           }
         } else {
@@ -85,8 +87,8 @@ export default function BuyerTrackPage({ params }: { params: Promise<{ id: strin
 
     fetchBatchData();
 
-    // 3. Setup Realtime Listener using constant dependencies
-    const channelId = `live-track-${unwrappedId.replace(/[^a-zA-Z0-9]/g, '')}`;
+    // 3. Setup Realtime Listener
+    const channelId = `live-track-${unwrappedId.replace(/[^a-zA-Z0-9]/g, "")}`;
     const channel = supabase
       .channel(channelId)
       .on(
@@ -94,7 +96,6 @@ export default function BuyerTrackPage({ params }: { params: Promise<{ id: strin
         { event: "UPDATE", schema: "public", table: "batches" },
         (payload) => {
           const updated = payload.new as any;
-          // Only update state if this change belongs to the record we are viewing
           if (updated.id === unwrappedId || updated.batch_number === unwrappedId.toUpperCase()) {
             setBatch(updated);
           }
@@ -103,9 +104,9 @@ export default function BuyerTrackPage({ params }: { params: Promise<{ id: strin
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [unwrappedId]); // dependency array is constant. Fixed "Rules of Hooks"
+  }, [unwrappedId]);
 
-  // 4. Reverse Geocoding Effect (Constant Dependency Array)
+  // 4. Reverse Geocoding Effect
   useEffect(() => {
     const lat = batch?.latitude || batch?.last_lat;
     const lng = batch?.longitude || batch?.last_lng;
@@ -128,10 +129,10 @@ export default function BuyerTrackPage({ params }: { params: Promise<{ id: strin
   // Record Not Found Screen
   if (!batch) return (
     <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-10 text-center font-mono relative overflow-hidden">
-       {/* Diagnostic Background Pattern */}
-       <div className="absolute inset-0 opacity-5 bg-[url('/scan-lines.png')]"></div>
-       <div className="absolute top-0 right-0 p-8 text-[8px] text-red-950 uppercase font-black tracking-widest leading-loose text-right">Error: Node Not Found<br/>Status: Forensic Match Failed<br/>Timestamp: {new Date().toISOString()}</div>
-       
+        {/* Diagnostic Background Pattern - Fixed Quote Nesting */}
+        <div className="absolute inset-0 opacity-5 bg-[url('/scan-lines.png')]"></div>
+        <div className="absolute top-0 right-0 p-8 text-[8px] text-red-950 uppercase font-black tracking-widest leading-loose text-right">Error: Node Not Found<br/>Status: Forensic Match Failed<br/>Timestamp: {new Date().toISOString()}</div>
+        
       <div className="border border-red-900/30 p-12 rounded-[3.5rem] bg-red-950/5 max-w-lg shadow-[0_0_60px_rgba(153,27,27,0.1)] relative z-10">
         <Activity className="w-12 h-12 text-red-900 mx-auto mb-6 animate-pulse" />
         <p className="text-[10px] font-black tracking-[0.5em] text-red-600 mb-4 uppercase italic">Forensic Record Missing</p>
@@ -148,13 +149,13 @@ export default function BuyerTrackPage({ params }: { params: Promise<{ id: strin
   // Full Forensic Tracking UI
   return (
     <div className="min-h-screen bg-[#050505] text-gray-300 font-mono p-6 md:p-12 relative overflow-hidden">
-       {/* Substrate Background Layer */}
+       {/* Substrate Background Layer - Fixed Quote Nesting */}
        <div className="absolute inset-0 opacity-5 bg-[url('/scan-lines.png')] z-0"></div>
-       <div className="absolute top-0 right-0 p-12 text-[7px] text-gray-950 uppercase font-black tracking-[0.3em] text-right z-0">System Node: Yoki-Terminal-4<br/>Auth Level: Public Public Access<br/>Port: 3000 Secured</div>
+       <div className="absolute top-0 right-0 p-12 text-[7px] text-gray-950 uppercase font-black tracking-[0.3em] text-right z-0">System Node: Yoki-Terminal-4<br/>Auth Level: Public Access<br/>Port: 3000 Secured</div>
 
       <header className="max-w-7xl mx-auto flex justify-between items-end mb-12 border-b border-gray-900/50 pb-10 relative z-10">
         <div>
-           <p className="text-[11px] text-cyan-500 font-black uppercase tracking-[0.3em] mb-3 flex items-center gap-2italic"><Activity className="w-4 h-4 animate-pulse text-cyan-500" /> Active System Trace</p>
+           <p className="text-[11px] text-cyan-500 font-black uppercase tracking-[0.3em] mb-3 flex items-center gap-2 italic"><Activity className="w-4 h-4 animate-pulse text-cyan-500" /> Active System Trace</p>
            <h1 className="text-3xl font-black text-white uppercase italic tracking-tighter">Consignment: {batch.batch_number}</h1>
         </div>
         <Link href="/" className="text-[10px] font-black uppercase text-gray-700 hover:text-red-500 transition-all border border-gray-900 px-6 py-3 rounded-2xl bg-black">End Session</Link>
@@ -184,7 +185,7 @@ export default function BuyerTrackPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
 
-        {/* Right Column: chain of Custody and Route */}
+        {/* Right Column: Chain of Custody and Route */}
         <div className="lg:col-span-4 space-y-8">
           <div className="bg-[#080808] border border-gray-900 rounded-[2.5rem] p-10 space-y-10 shadow-xl relative overflow-hidden">
              <div className="absolute top-0 right-0 p-4 opacity-5"><ShieldCheck className="w-24 h-24 text-cyan-500" /></div>
@@ -195,21 +196,21 @@ export default function BuyerTrackPage({ params }: { params: Promise<{ id: strin
                 <div className="flex items-center gap-6">
                   <div className="p-4 bg-black border border-gray-800 rounded-2xl text-cyan-500 shadow-inner"><UserCircle className="w-7 h-7" /></div>
                   <div>
-                    <p className="text-lg font-black text-white uppercase italic tracking-tighter">{driverInfo.assigned_driver_name || driverInfo.driver_name}</p>
+                    <p className="text-lg font-black text-white uppercase italic tracking-tighter">{driverInfo.name}</p>
                     <p className="text-[8px] text-gray-600 uppercase font-bold mt-1 tracking-widest">Authorized Personnel</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-6">
                   <div className="p-4 bg-black border border-gray-800 rounded-2xl text-cyan-500 shadow-inner"><Phone className="w-7 h-7" /></div>
                   <div>
-                    <p className="text-lg font-black text-white uppercase italic tracking-tighter">{driverInfo.assigned_driver_phone || driverInfo.driver_phone}</p>
+                    <p className="text-lg font-black text-white uppercase italic tracking-tighter">{driverInfo.phone}</p>
                     <p className="text-[8px] text-gray-600 uppercase font-bold mt-1 tracking-widest">Satellite Comm Link</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-6 pt-10 border-t border-gray-900/50">
                   <div className="p-4 bg-black border border-gray-800 rounded-2xl text-cyan-500 shadow-inner"><CreditCard className="w-7 h-7" /></div>
                   <div>
-                    <p className="text-lg font-black text-white uppercase italic tracking-tighter">{driverInfo.plate_number}</p>
+                    <p className="text-lg font-black text-white uppercase italic tracking-tighter">{driverInfo.plate}</p>
                     <p className="text-[8px] text-gray-600 uppercase font-bold mt-1 tracking-widest">Transport Vessel ID</p>
                   </div>
                 </div>
